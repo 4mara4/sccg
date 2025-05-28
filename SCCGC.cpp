@@ -5,7 +5,19 @@
 #include <vector>
 using namespace std;
 
-class K_mer { // Dora writing
+/**
+ * @class K_mer
+ * @brief Represents a fixed-length substring (“k-mer”) of a genomic sequence and its position.
+ *
+ * The K_mer class encapsulates a k-mer string and the index at which this k-mer
+ * begins in the full sequence. It provides simple getters and setters for both
+ * the k-mer content and its start position, allowing building and querying
+ * of a local hash map for fast k-mer lookups during reference-based compression.
+ *
+ * Dora writing
+ */
+
+class K_mer {
 private:
     string k_mer;
     int start;
@@ -34,13 +46,45 @@ public:
         start = start_;
     }
 };
-class SCCGC {   //  Dora writing 
+
+/**
+ * @class SCCGC
+ * @brief Core class for reference-based genome compression: handles sequence I/O and k-mer indexing.
+ *
+ * The SCCGC class encapsulates the main functionality required to prepare genomic data
+ * for local matching against a reference:
+ *   - Reading and parsing FASTA-formatted sequences for both local and global matching phases.
+ *   - Tracking metadata (e.g., chromosome label, sequence length).
+ *   - Building a hash-based index of k-mers to accelerate substring lookups.
+ *
+ * Individual matching, formatting, and compression steps are implemented in
+ * separate member functions, each documented at its own definition.
+ *
+ * Dora writing
+ */
+
+class SCCGC {
 public:
     string meta_data;
     int length;
     unordered_map<size_t, vector<K_mer>> localHash;
 
-    string LocReadSeq(const string& filename) {  // reads the sequence for local matching
+    /**
+     * @brief Reads a single-sequence FASTA file for local k-mer matching.
+     *
+     * This function opens the specified file, expects the first line to be a metadata/header,
+     * and concatenates all subsequent lines into one continuous sequence string.
+     * It stores the header in the class’s `meta_data` member and records the length
+     * of the first data line in `length`. Designed for preparing a sequence for local matching.
+     *
+     * @param filename Path to the input FASTA file.
+     * @return A std::string containing the full sequence (with all line breaks removed).
+     * @throws std::runtime_error if the file cannot be opened or is empty.
+     *
+     * Dora writing
+     */
+
+    string LocReadSeq(const string& filename) { 
         ifstream sequence_file(filename);
         if (!sequence_file.is_open()) {
             throw runtime_error("Could not open file: " + filename);
@@ -48,7 +92,7 @@ public:
         stringstream ss;
         string line;
         bool is_first_line = true;
-        if(getline(sequence_file, line)) {   // the first line is the metadata
+        if(getline(sequence_file, line)) {
             meta_data = line;
         }else {
             throw runtime_error("File is empty: " + filename);
@@ -63,7 +107,21 @@ public:
         sequence_file.close();
         return ss.str();
     }
-    string GloReadRefSeq(const string& filename) {  // reads the reference sequence for global matching
+
+    /**
+     * @brief Reads a FASTA reference file for global k-mer matching.
+     *
+     * Opens the specified FASTA file, skips the header line, and processes each subsequent line
+     * by converting all characters to uppercase and removing any 'N' bases. The cleaned sequence
+     * is concatenated into a single string and returned.
+     *
+     * @param filename Path to the input FASTA reference file.
+     * @return A std::string containing the full reference sequence with no 'N' characters.
+     * @throws std::runtime_error if the file cannot be opened or if it is empty.
+     *
+     * Dora writing
+     */
+    string GloReadRefSeq(const string& filename) {
     
         ifstream sequence_file(filename);
         if (!sequence_file.is_open()) {
@@ -71,7 +129,7 @@ public:
         }
         stringstream ss;
         string line;
-        if(!getline(sequence_file, line)) {   // the first line is the metadata
+        if(!getline(sequence_file, line)) {
             throw runtime_error("File is empty: " + filename);
         }
 
@@ -88,7 +146,25 @@ public:
         sequence_file.close();
         return ss.str();
     }
-    string GloReadTarSeq(const string& inputfilename, const string& outputfilename){ // reads the target sequence for global matching and finds lowercase_mode areas and N areas and returns the rest
+
+    /**
+     * @brief Reads a FASTA target file for global k-mer matching and records lowercase/N regions.
+     *
+     * Opens the given input FASTA file, writes its header and line-length metadata to the specified output file,
+     * then scans each sequence line to identify regions of lowercase bases and runs of 'N's. It logs the
+     * start offsets and lengths of those regions to the output, converting all bases to uppercase
+     * (excluding 'N's from the returned sequence). Finally, it returns a cleaned sequence string
+     * with all 'N' characters removed.
+     *
+     * @param inputfilename  Path to the input FASTA target file.
+     * @param outputfilename Path to the file where header, line-length, lowercase/N region data are appended.
+     * @return A std::string containing the target sequence with all 'N' characters stripped out.
+     * @throws std::runtime_error if either the input or output file cannot be opened.
+     *
+     * Dora writing
+     */
+
+    string GloReadTarSeq(const string& inputfilename, const string& outputfilename){
         ifstream infile(inputfilename);
         ofstream outfile(outputfilename, ios::app); 
         stringstream Llist, Nlist, clean_seq;
@@ -101,7 +177,7 @@ public:
         }
 
         string meta_data, line;
-        getline(infile, meta_data); // first line is metadata
+        getline(infile, meta_data);
         outfile << meta_data << '\n';
         
         int line_length = 0, length_read = 0, length_lower = 0, lenght_N = 0, end_L = 0, end_N = 0, start_L = 0, start_N = 0;
@@ -118,16 +194,15 @@ public:
             for (int i = 0; i < line_length; ++i) {
                 char current_ch = line[i];
 
-                // checking for lowercase_mode
                 if (islower(current_ch)) {
                     length_lower++;
-                    if (!lowercase_mode) { // the start of a new lowercase_mode sequence
+                    if (!lowercase_mode) {
                         lowercase_mode = true;
                         start_L = i + length_read;
-                        int offset=start_L - end_L;  // offset from the end of the last lowercase_mode sequence
+                        int offset=start_L - end_L;
                         Llist << (offset) << ':';
                     }
-                    current_ch = toupper(current_ch);  // now that we have noted where it is lowercase_mode, we convert it to uppercase
+                    current_ch = toupper(current_ch);
                 } else {
                     if (lowercase_mode) {
                         Llist << length_lower << ' '; 
@@ -137,13 +212,12 @@ public:
                     length_lower = 0;
                 }
 
-                // checking for N
                 if (current_ch == 'N') { 
                     lenght_N++;
-                    if (!N_mode)  {  // the start of a new N sequence
+                    if (!N_mode)  {
                         N_mode = true;
                         start_N = i + length_read;
-                        int offset = start_N - end_N;  // offset from the end of the last N sequence
+                        int offset = start_N - end_N;
                         Nlist <<offset << ':';
                     }
                 } else {
@@ -154,16 +228,16 @@ public:
                     N_mode = false;
                     lenght_N = 0;
 
-                    clean_seq << current_ch;  // the N characters are left out of the clean sequence
+                    clean_seq << current_ch;
                 }
             }
             length_read += line_length;
         }
 
-        if(lowercase_mode) {  // if we were left in lowercase mode at the end of the file
+        if(lowercase_mode) {
             Llist << length_lower << ' ';
         }
-        if(N_mode) {  // if we were left in N mode at the end of the file
+        if(N_mode) {
             Nlist << lenght_N << ' ';
         }
         
@@ -175,6 +249,21 @@ public:
 
         return clean_seq.str();
     }
+
+    /**
+     * @brief Builds a local hash index of k-mers for fast substring lookup.
+     *
+     * Iterates over the given sequence, extracts each k-length substring (k-mer),
+     * and inserts it into an unordered_map where the key is the hash of the k-mer
+     * and the value is a vector of K_mer instances containing the k-mer string
+     * and its start position. Consecutive 'N'-only k-mers are skipped to avoid
+     * indexing non-informative regions.
+     *
+     * @param seq The input sequence string to index.
+     * @param kmer_length The length of each k-mer to extract and index.
+     *
+     * Dora writing
+     */
     
     void createLocalHash(const string& seq, int kmer_length) {
         int start_ = 0;
@@ -190,6 +279,7 @@ public:
             start_++;         
         }
     }
+
 };
 int main() {
     SCCGC reader;
