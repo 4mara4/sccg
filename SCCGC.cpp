@@ -68,6 +68,10 @@ public:
     string meta_data;
     int length;
     unordered_map<size_t, vector<K_mer>> localHash;
+    unordered_map<size_t, vector<K_mer>> globalHash;
+    vector<unordered_map<size_t, vector<K_mer>>> refLocalHashes;
+    vector<unordered_map<size_t, vector<K_mer>>> tarLocalHashes;
+
 
     /**
      * @brief Reads a single-sequence FASTA file for local k-mer matching.
@@ -262,10 +266,11 @@ public:
      * @param seq The input sequence string to index.
      * @param kmer_length The length of each k-mer to extract and index.
      *
-     * Dora writing
+     * Dora + Marija writing
      */
     
     void createLocalHash(const string& seq, int kmer_length) {
+        localHash.clear();
         int start_ = 0;
         while (start_ <= seq.length()- kmer_length) {
             string kmer = seq.substr(start_, kmer_length);
@@ -280,9 +285,58 @@ public:
         }
     }
 
+    /**
+     * @brief Builds a global hash index of k-mers, storing full K_mer objects.
+     *
+     * Iterates over the given sequence, extracts each k-length substring (k-mer),
+     * skips any k-mers containing 'N', and inserts a K_mer (string+start) into
+     * an unordered_map keyed by the k-mer’s hash. This lets you look up not only
+     * the positions but also carry around the exact k-mer text if needed.
+     *
+     * @param seq           The input reference sequence string to index.
+     * @param kmer_length   The length of each k-mer to extract and index.
+     *
+     * Marija writing
+     */
+
+    void createGlobalHash(const string& seq, int kmer_length) {
+        globalHash.clear();
+        int limit = seq.length() - kmer_length;
+        for(int i = 0; i <= limit; ++i) {
+            string kmer = seq.substr(i, kmer_length);
+            if(kmer.find('N') != string::npos) {
+                continue;
+            }
+            size_t key = hash<string>{}(kmer);
+            K_mer entry(kmer, i);
+            globalHash[key].push_back(entry);
+        }
+    }
+
+    /**
+    * @brief Splits a sequence into consecutive blocks of given size.
+    *
+    * @param seq         The full sequence string to split.
+    * @param block_size  Maximum length of each block.
+    * @return vector<string>  List of sequence blocks.
+    *
+    * Marija writing
+    */
+    vector<string> createBlocks(const string& seq, int block_size) {
+        vector<string> blocks;
+        int total = seq.size();
+        for (int start = 0; start < total; start += block_size) {
+            int len = min(block_size, total - start);
+            blocks.push_back(seq.substr(start, len));
+        }
+        return blocks;
+    }
+
 };
 int main() {
     SCCGC reader;
+    const int kmer_length = 3;
+    const int block_size = 6;
     try {
         string sequence = reader.LocReadSeq("sekvenca_ref.txt");  
         cout << "Meta data: " << reader.meta_data << endl;
@@ -291,7 +345,19 @@ int main() {
         cout << "Ref sequence: " << sequence_ref<< endl;
         string sequence_tar = reader.GloReadTarSeq("sekvenca_tar.txt", "output.txt");
         cout << "Target sequence: " << sequence_tar << endl;
-        reader.createLocalHash(sequence_ref, 3);  // Example k-mer length of 3
+        vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
+        vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
+
+        for(auto &block : refBlocks) {
+            reader.createLocalHash(block, kmer_length);
+            reader.refLocalHashes.push_back(reader.localHash);
+        }
+        for(auto &block : tarBlocks) {
+            reader.createLocalHash(block, kmer_length);
+            reader.tarLocalHashes.push_back(reader.localHash);
+        }
+
+        /** reader.createLocalHash(sequence_ref, kmer_length);
         for (const auto& pair : reader.localHash) {
             size_t key = pair.first;
             const vector<K_mer>& kmers = pair.second;
@@ -301,6 +367,32 @@ int main() {
                 cout << "[" << kmer_obj.getKmer() << ", start=" << kmer_obj.getStart() << "] ";
             }
             cout << endl;
+        } **/
+        cout << "Local hash tables for reference sequence\n";
+        for(size_t i = 0; i < reader.refLocalHashes.size(); ++i) {
+            unordered_map<size_t, vector<K_mer>> refLocalHash = reader.refLocalHashes[i];
+            for(const auto& pair : refLocalHash) {
+                size_t key = pair.first;
+                const vector<K_mer>& kmers = pair.second;
+                cout << "Key: " << key << " -> kmers: ";
+                for(const K_mer& kmer_obj : kmers) {
+                    cout << "[" << kmer_obj.getKmer() << ", start=" << kmer_obj.getStart() << "] ";
+                }
+                cout << endl;
+            }
+        }
+        cout << "Local hash tables for target sequence\n";
+        for(size_t i = 0; i < reader.tarLocalHashes.size(); ++i) {
+            unordered_map<size_t, vector<K_mer>> tarLocalHash = reader.tarLocalHashes[i];
+            for(const auto& pair : tarLocalHash) {
+                size_t key = pair.first;
+                const vector<K_mer>& kmers = pair.second;
+                cout << "Key: " << key << " -> kmers: ";
+                for(const K_mer& kmer_obj : kmers) {
+                    cout << "[" << kmer_obj.getKmer() << ", start=" << kmer_obj.getStart() << "] ";
+                }
+                cout << endl;
+            }
         }
         
     } catch (const exception& e) {
