@@ -5,6 +5,13 @@
 #include <vector>
 using namespace std;
 
+struct Position {
+    int startinRef;
+    int endinRef;
+    int startinTar;
+    int endinTar;
+};
+
 /**
  * @class K_mer
  * @brief Represents a fixed-length substring (“k-mer”) of a genomic sequence and its position.
@@ -332,11 +339,70 @@ public:
         return blocks;
     }
 
+    vector<Position> localMatch(const string& reference,
+                            const string& target,
+                            int kmer_length) {
+        vector<Position> matches;
+        int index = 0, tlen = target.length();
+        while (index + kmer_length <= tlen) {
+            string kmer = target.substr(index, kmer_length);
+            size_t key = hash<string>{}(kmer);
+            if (!localHash.count(key)) { index++; continue; }
+            auto &klist = localHash[key];
+            int bestStart = INT_MAX, bestExtend = 0;
+            for (auto &km : klist) {
+                if (km.getKmer() != kmer) continue;
+                int incre = 0;
+                int rpos = km.getStart() + kmer_length;
+                int tpos = index + kmer_length;
+                while (rpos < (int)reference.length() && tpos < tlen && reference[rpos] == target[tpos]) {
+                    incre++; rpos++; tpos++;
+                }
+                if (incre > bestExtend || (incre == bestExtend && km.getStart() < bestStart)) {
+                    bestExtend = incre;
+                    bestStart = km.getStart();
+                }
+            }
+            if (bestStart == INT_MAX) { index++; continue; }
+            Position p;
+            p.startinTar = index;
+            p.endinTar   = index + kmer_length + bestExtend - 1;
+            p.startinRef = bestStart;
+            p.endinRef   = bestStart + kmer_length + bestExtend - 1;
+            matches.push_back(p);
+            index += kmer_length + bestExtend + 1;
+        }
+        return matches;
+    }
+
+     vector<Position> globalMatch(const string& ref, const string& tar, int klen) {
+        createGlobalHash(ref, klen);
+        vector<Position> out;
+        int idx=0;
+        while (idx + klen <= tar.size()) {
+            string k=tar.substr(idx,klen);
+            size_t h=hash<string>{}(k);
+            if (!globalHash.count(h)) { idx++; continue; }
+            int bestS=INT_MAX, bestE=0;
+            for (auto &km: globalHash[h]) if (km.getKmer()==k) {
+                int ext=0, r=km.getStart()+klen, t=idx+klen;
+                while (r<ref.size()&&t<tar.size()&&ref[r]==tar[t]){ext++;r++;t++;}
+                if (ext>bestE||(ext==bestE&&km.getStart()<bestS)) {bestE=ext;bestS=km.getStart();}
+            }
+            if (bestS!=INT_MAX) {
+                out.push_back({bestS, bestS+klen+bestE-1, idx, idx+klen+bestE-1});
+                idx += klen+bestE+1;
+            } else idx++;
+        }
+        return out;
+    }
+
+
 };
 int main() {
     SCCGC reader;
     const int kmer_length = 3;
-    const int block_size = 6;
+    const int block_size = 4;
     try {
         string sequence = reader.LocReadSeq("sekvenca_ref.txt");  
         cout << "Meta data: " << reader.meta_data << endl;
@@ -348,52 +414,26 @@ int main() {
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
 
-        for(auto &block : refBlocks) {
-            reader.createLocalHash(block, kmer_length);
-            reader.refLocalHashes.push_back(reader.localHash);
+        cout << "=== Lokalna podudaranja ===\n";
+        for (size_t i = 0; i < refBlocks.size(); ++i) {
+            reader.createLocalHash(refBlocks[i], kmer_length);
+            auto matches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
+
+            cout << "Block " << i << ": Pronadeno " << matches.size() << " podudaranja\n";
+            for (auto &m : matches) {
+                cout << "  Ref[" << m.startinRef << "-" << m.endinRef << "] "  
+                     << "Tar[" << m.startinTar << "-" << m.endinTar << "]\n";
+            }
         }
-        for(auto &block : tarBlocks) {
-            reader.createLocalHash(block, kmer_length);
-            reader.tarLocalHashes.push_back(reader.localHash);
+        cout << "=== Globalna podudaranja ===\n";
+        reader.globalHash.clear();
+        auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
+        cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
+        for (auto &m : globalMatches) {
+            cout << "Ref[" << m.startinRef << "-" << m.endinRef
+                 << "] Tar[" << m.startinTar << "-" << m.endinTar << "]\n";
         }
 
-        /** reader.createLocalHash(sequence_ref, kmer_length);
-        for (const auto& pair : reader.localHash) {
-            size_t key = pair.first;
-            const vector<K_mer>& kmers = pair.second;
-
-            cout << "Key: " << key << " -> kmers: ";
-            for (const K_mer& kmer_obj : kmers) {
-                cout << "[" << kmer_obj.getKmer() << ", start=" << kmer_obj.getStart() << "] ";
-            }
-            cout << endl;
-        } **/
-        cout << "Local hash tables for reference sequence\n";
-        for(size_t i = 0; i < reader.refLocalHashes.size(); ++i) {
-            unordered_map<size_t, vector<K_mer>> refLocalHash = reader.refLocalHashes[i];
-            for(const auto& pair : refLocalHash) {
-                size_t key = pair.first;
-                const vector<K_mer>& kmers = pair.second;
-                cout << "Key: " << key << " -> kmers: ";
-                for(const K_mer& kmer_obj : kmers) {
-                    cout << "[" << kmer_obj.getKmer() << ", start=" << kmer_obj.getStart() << "] ";
-                }
-                cout << endl;
-            }
-        }
-        cout << "Local hash tables for target sequence\n";
-        for(size_t i = 0; i < reader.tarLocalHashes.size(); ++i) {
-            unordered_map<size_t, vector<K_mer>> tarLocalHash = reader.tarLocalHashes[i];
-            for(const auto& pair : tarLocalHash) {
-                size_t key = pair.first;
-                const vector<K_mer>& kmers = pair.second;
-                cout << "Key: " << key << " -> kmers: ";
-                for(const K_mer& kmer_obj : kmers) {
-                    cout << "[" << kmer_obj.getKmer() << ", start=" << kmer_obj.getStart() << "] ";
-                }
-                cout << endl;
-            }
-        }
         
     } catch (const exception& e) {
         cerr << "Greška: " << e.what() << endl;

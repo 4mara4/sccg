@@ -2,3 +2,19 @@
 12
 1:2 
 
+>chromosome_1
+12
+1:2 
+
+>chromosome_1
+12
+1:2 
+
+>chromosome_1
+12
+1:2 
+
+>chromosome_1
+12
+1:2 
+
