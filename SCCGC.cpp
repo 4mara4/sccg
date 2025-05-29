@@ -3,13 +3,26 @@
 #include <sstream>
 #include <unordered_map>
 #include <vector>
+#include <ctime>
+#include <windows.h>  // Just testing on windows
 using namespace std;
+/*   ON LINUX
+long long getCPUTime() {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
+        return static_cast<long long>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec; // nanosekunde
+    } else {
+        return 0LL;
+    }
+} */
+
 
 struct Position {
-    int startinRef;
-    int endinRef;
-    int startinTar;
-    int endinTar;
+    int startInRef;
+    int endInRef;
+    int startInTar;
+    int endInTar;
+
 };
 
 /**
@@ -365,10 +378,10 @@ public:
             }
             if (bestStart == INT_MAX) { index++; continue; }
             Position p;
-            p.startinTar = index;
-            p.endinTar   = index + kmer_length + bestExtend - 1;
-            p.startinRef = bestStart;
-            p.endinRef   = bestStart + kmer_length + bestExtend - 1;
+            p.startInTar = index;
+            p.endInTar   = index + kmer_length + bestExtend - 1;
+            p.startInRef = bestStart;
+            p.endInRef   = bestStart + kmer_length + bestExtend - 1;
             matches.push_back(p);
             index += kmer_length + bestExtend + 1;
         }
@@ -391,18 +404,99 @@ public:
             }
             if (bestS!=INT_MAX) {
                 out.push_back({bestS, bestS+klen+bestE-1, idx, idx+klen+bestE-1});
-                idx += klen+bestE+1;
+                idx += klen+bestE;   // check later if this is correct
             } else idx++;
         }
         return out;
     }
 
+    /*
+ * format_matches: Formats and outputs aligned and unaligned segments between
+ * a reference and target sequence based on a list of alignment positions.
+ * 
+ * Arguments:
+ *  - list: vector of Position structs defining aligned regions
+ *  - target: the target sequence string
+ *  - sor: optional offset to shift reference positions (default 0)
+ *  - fileName: optional output file to save the formatted result
+ * 
+ * Returns:
+ *  - the last Position from the input list
+ * 
+ * Functionality:
+ *  - Writes aligned regions as reference position ranges (adjusted by sor)
+ *  - Inserts unaligned/mismatched sequence fragments from target as-is
+ *  - Optionally saves the result to a file
+ * Dora writing
+ */
+Position format_matches(const vector<Position>& list, const string& target,
+                        int sor = 0, const string& fileName = "") {
+    string result;
+    int trouble_parts = 0, endRef = 0, endInTar = 0;
+
+    for (size_t i = 0; i < list.size(); ++i) {
+        int startInTar = list[i].startInTar;
+        int startInRef = list[i].startInRef;
+        int endInRef = list[i].endInRef;
+        int endInTarCurr = list[i].endInTar;
+
+        if (i == 0) {
+            endInTar = endInTarCurr;
+            endRef = max(endRef, endInRef);
+
+            if (startInTar > 0) {
+                string pre_allign = target.substr(0, startInTar);
+                result += pre_allign + "\n";    // we write the pre-aligned part
+                trouble_parts += pre_allign.length();
+            }
+            result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";
+            continue;
+        }
+
+        int endInTarPrev = list[i - 1].endInTar;
+        string mismatch = target.substr(endInTarPrev + 1, startInTar - endInTarPrev - 1);   // mismatch part between two alignments	
+
+        if (!mismatch.empty()) {
+            result += mismatch + "\n";     // if there was a mismatched part we need to write it down
+            trouble_parts += mismatch.length();
+        }
+
+        result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";    // we write the aligned part
+        endInTar = endInTarCurr;
+        endRef = max(endRef, endInRef);
+    }
+
+    // Optional: if alignment ends early, append the remainder of target
+    if (endInTar < static_cast<int>(target.length()) - 1) {
+        result += target.substr(endInTar + 1) + "\n";
+    }
+
+    // Optional: write to file
+    if (!fileName.empty()) {
+        ofstream out(fileName);
+        if (out.is_open()) {
+            out << result;
+            out.close();
+        } else {
+            cerr << "Could not open file: " << fileName << "\n";
+        }
+    }
+
+    // Optional: logic for mismatch counter  !!!!!!!!!!!!!!!!!!!!!!!!!!! check later
+    // if (trouble_parts > (sub_length * T1)) {
+    //     mismatch++;
+    // }
+
+    return list.back(); // return the last Position
+}
+
 
 };
 int main() {
+    // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
     SCCGC reader;
     const int kmer_length = 3;
-    const int block_size = 4;
+    const int block_size = 16;
     try {
         string sequence = reader.LocReadSeq("sekvenca_ref.txt");  
         cout << "Meta data: " << reader.meta_data << endl;
@@ -411,18 +505,19 @@ int main() {
         cout << "Ref sequence: " << sequence_ref<< endl;
         string sequence_tar = reader.GloReadTarSeq("sekvenca_tar.txt", "output.txt");
         cout << "Target sequence: " << sequence_tar << endl;
+        cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
 
         cout << "=== Lokalna podudaranja ===\n";
         for (size_t i = 0; i < refBlocks.size(); ++i) {
             reader.createLocalHash(refBlocks[i], kmer_length);
-            auto matches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
+            auto localMatches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
 
-            cout << "Block " << i << ": Pronadeno " << matches.size() << " podudaranja\n";
-            for (auto &m : matches) {
-                cout << "  Ref[" << m.startinRef << "-" << m.endinRef << "] "  
-                     << "Tar[" << m.startinTar << "-" << m.endinTar << "]\n";
+            cout << "Block " << i << ": Pronadeno " << localMatches.size() << " podudaranja\n";
+            for (auto &m : localMatches) {
+                cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
+                     << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
             }
         }
         cout << "=== Globalna podudaranja ===\n";
@@ -430,14 +525,20 @@ int main() {
         auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
         cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
         for (auto &m : globalMatches) {
-            cout << "Ref[" << m.startinRef << "-" << m.endinRef
-                 << "] Tar[" << m.startinTar << "-" << m.endinTar << "]\n";
+            cout << "Ref[" << m.startInRef << "-" << m.endInRef
+                 << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
         }
+
+        Position lastPosGl = reader.format_matches(globalMatches, sequence_tar, 0, "matches_output.txt");
 
         
     } catch (const exception& e) {
         cerr << "Greška: " << e.what() << endl;
     }
+
+    // long long end_time = getCPUTime();    UNCOMMENT ON LINUX
+    
+    // cout << "Execution time " << (end_time - start_time) << endl;  UNCOMMENT ON LINUX 
     system("pause"); 
     return 0;
 }
