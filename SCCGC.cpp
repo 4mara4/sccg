@@ -91,6 +91,10 @@ public:
     unordered_map<size_t, vector<K_mer>> globalHash;
     vector<unordered_map<size_t, vector<K_mer>>> refLocalHashes;
     vector<unordered_map<size_t, vector<K_mer>>> tarLocalHashes;
+    double bad_segment_treshold=0.5;  
+    int consecutive_bad_segment_tresh=4;
+    int consec_bad_segments=0;
+
 
 
     /**
@@ -430,9 +434,10 @@ public:
  * Dora writing
  */
 Position format_matches(const vector<Position>& list, const string& target,
-                        int sor = 0, const string& fileName = "") {
+                        int sor = 0, const string& fileName = "",bool local=true) {
     string result;
     int trouble_parts = 0, endRef = 0, endInTar = 0;
+    bool bad_Segment=false;
 
     for (size_t i = 0; i < list.size(); ++i) {
         int startInTar = list[i].startInTar;
@@ -473,19 +478,26 @@ Position format_matches(const vector<Position>& list, const string& target,
 
     // Optional: write to file
     if (!fileName.empty()) {
-        ofstream out(fileName);
+        ofstream out;
+        if(local){out.open(fileName, ios::app); }
+        else{out.open(fileName); }
         if (out.is_open()) {
-            out << result;
+            out << result <<"\n";
             out.close();
         } else {
             cerr << "Could not open file: " << fileName << "\n";
         }
     }
 
-    // Optional: logic for mismatch counter  !!!!!!!!!!!!!!!!!!!!!!!!!!! check later
-    // if (trouble_parts > (sub_length * T1)) {
-    //     mismatch++;
-    // }
+    //logic for mismatch counter
+    cout<< "\ntrouble parts : "<< trouble_parts << " target_size \n" << target.size() << endl;
+    if (trouble_parts > (target.size() * bad_segment_treshold)) {
+        consec_bad_segments++;
+        cout << "BAD SEGMENT if there are multiple consecutive go global, consecutive bad segments " << consec_bad_segments<< endl;
+    } else {
+        consec_bad_segments=0;
+        cout<<"Consecutive bad segments " << consec_bad_segments<< endl;
+    }
 
     return list.back(); // return the last Position
 }
@@ -494,6 +506,11 @@ Position format_matches(const vector<Position>& list, const string& target,
 };
 int main() {
     // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
+
+    ofstream cleaner("local_matches_output.txt");
+    cleaner.close();
+    ofstream cleaner2("global_matches_output.txt");
+    cleaner2.close();
     SCCGC reader;
     const int kmer_length = 3;
     const int block_size = 16;
@@ -502,25 +519,31 @@ int main() {
         cout << "Meta data: " << reader.meta_data << endl;
         cout << "Local sequence read: " << sequence << endl;
         string sequence_ref = reader.GloReadRefSeq("sekvenca_ref.txt");  
-        cout << "Ref sequence: " << sequence_ref<< endl;
+        cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
         string sequence_tar = reader.GloReadTarSeq("sekvenca_tar.txt", "output.txt");
-        cout << "Target sequence: " << sequence_tar << endl;
+        cout << "Target sequence: " << sequence_tar <<" size "  << sequence_tar.size()<< endl;
         cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
 
         cout << "=== Lokalna podudaranja ===\n";
-        for (size_t i = 0; i < refBlocks.size(); ++i) {
+        for (size_t i = 0; i < min(refBlocks.size(), tarBlocks.size()); ++i) {    // check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  provjeri jel ok ? 
             reader.createLocalHash(refBlocks[i], kmer_length);
-            auto localMatches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
+            vector<Position> localMatches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
 
-            cout << "Block " << i << ": Pronadeno " << localMatches.size() << " podudaranja\n";
+            cout << "\nBlock " << i << ": Pronadeno " << localMatches.size() << " podudaranja\n";
             for (auto &m : localMatches) {
                 cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
                      << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
             }
+            Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], 0, "local_matches_output.txt");
+            if(reader.consec_bad_segments >= reader.consecutive_bad_segment_tresh){
+                cout << "moramo prec na globalno, ne idemo dalje lokalno"<< endl;
+                break;
+            }
+            
         }
-        cout << "=== Globalna podudaranja ===\n";
+        cout << "\n=== Globalna podudaranja ===\n";
         reader.globalHash.clear();
         auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
         cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
@@ -529,7 +552,7 @@ int main() {
                  << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
         }
 
-        Position lastPosGl = reader.format_matches(globalMatches, sequence_tar, 0, "matches_output.txt");
+        Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, 0, "global_matches_output.txt");
 
         
     } catch (const exception& e) {
