@@ -192,10 +192,11 @@ public:
      * Dora writing
      */
 
-    string GloReadTarSeq(const string& inputfilename, const string& outputfilename){
+    string GloReadTarSeq(const string& inputfilename, const string& outputfilename, 
+                            string& meta_data, int& line_length, string& Llist, string& Nlist){
         ifstream infile(inputfilename);
         ofstream outfile(outputfilename, ios::app); 
-        stringstream Llist, Nlist, clean_seq;
+        //stringstream Llist, Nlist, clean_seq;
 
         if (!infile.is_open()) {
             throw runtime_error("Could not open file: " + inputfilename);
@@ -204,22 +205,23 @@ public:
             throw runtime_error("Could not open file: " + outputfilename);
         }
 
-        string meta_data, line;
+        //string meta_data, line;
+        string line;
         getline(infile, meta_data);
-        outfile << meta_data << '\n';
         
-        int line_length = 0, length_read = 0, length_lower = 0, lenght_N = 0, end_L = 0, end_N = 0, start_L = 0, start_N = 0;
-        bool lowercase_mode = false, N_mode = false, first_line = true;
+        int length_read = 0, length_lower = 0, length_N = 0, end_L = 0, end_N = 0, start_L = 0, start_N = 0;
+        bool lowercase_mode = false, N_mode = false;
+        string clean_seq;
 
+        bool first_data_line = true;
         while (getline(infile, line)) {
-            line_length = line.length();
-
-            if (first_line) {
-                outfile << line_length << '\n';
-                first_line = false;
+            if(first_data_line) {
+                line_length = static_cast<int>(line.size());
+                first_data_line = false;
             }
+            int l = line.size();
 
-            for (int i = 0; i < line_length; ++i) {
+            for (int i = 0; i < l; ++i) {
                 char current_ch = line[i];
 
                 if (islower(current_ch)) {
@@ -227,56 +229,55 @@ public:
                     if (!lowercase_mode) {
                         lowercase_mode = true;
                         start_L = i + length_read;
-                        int offset=start_L - end_L;
-                        Llist << (offset) << ':';
+                        Llist += to_string(start_L - end_L) + ":";
                     }
                     current_ch = toupper(current_ch);
-                } else {
-                    if (lowercase_mode) {
-                        Llist << length_lower << ' '; 
-                        end_L = start_L + length_lower - 1;
-                    }
+                } else if (lowercase_mode) {
                     lowercase_mode = false;
+                    end_L = start_L + length_lower;
+                    Llist += to_string(length_lower) + " ";
                     length_lower = 0;
                 }
-
-                if (current_ch == 'N') { 
-                    lenght_N++;
-                    if (!N_mode)  {
+                if(current_ch == 'N') {
+                    if(!N_mode) {
                         N_mode = true;
-                        start_N = i + length_read;
-                        int offset = start_N - end_N;
-                        Nlist <<offset << ':';
+                        start_N = length_read + i;
+                        Nlist += to_string(start_N - end_N) + ":";
                     }
-                } else {
-                    if (N_mode) {
-                        Nlist << lenght_N << ' ';
-                        end_N = start_N + lenght_N -1;
-                    }
+                    length_N++;
+                } else if (N_mode) {
                     N_mode = false;
-                    lenght_N = 0;
-
-                    clean_seq << current_ch;
+                    end_N = start_N + length_N;
+                    Nlist += to_string(length_N) + " ";
+                    length_N = 0;
+                }
+                if(current_ch != 'N') {
+                    clean_seq += current_ch;
                 }
             }
-            length_read += line_length;
+            length_read += l;
         }
-
         if(lowercase_mode) {
-            Llist << length_lower << ' ';
+            Llist += to_string(length_lower) + " ";
         }
         if(N_mode) {
-            Nlist << lenght_N << ' ';
+            Nlist += to_string(length_N) + " ";
         }
-        
-        outfile << Llist.str() << '\n';
-        outfile << Nlist.str() << '\n';
-
-        infile.close();
-        outfile.close();
-
-        return clean_seq.str();
+        return clean_seq;
     }
+    void writePreamble(const string &finalFile,
+                   const string &meta_data,
+                   int line_length,
+                   const string &Llist,
+                   const string &Nlist) {
+        ofstream out(finalFile, ios::trunc);
+        if (!out) throw runtime_error("Cannot open "+finalFile);
+        out << meta_data << "\n"
+            << line_length << "\n"
+            << Llist   << "\n"
+            << Nlist   << "\n\n";  // prazna linija prije postProcessa
+}
+
 
     /**
      * @brief Builds a local hash index of k-mers for fast substring lookup.
@@ -415,95 +416,140 @@ public:
     }
 
     /*
- * format_matches: Formats and outputs aligned and unaligned segments between
- * a reference and target sequence based on a list of alignment positions.
- * 
- * Arguments:
- *  - list: vector of Position structs defining aligned regions
- *  - target: the target sequence string
- *  - sor: optional offset to shift reference positions (default 0)
- *  - fileName: optional output file to save the formatted result
- * 
- * Returns:
- *  - the last Position from the input list
- * 
- * Functionality:
- *  - Writes aligned regions as reference position ranges (adjusted by sor)
- *  - Inserts unaligned/mismatched sequence fragments from target as-is
- *  - Optionally saves the result to a file
- * Dora writing
- */
-Position format_matches(const vector<Position>& list, const string& target,
+     * format_matches: Formats and outputs aligned and unaligned segments between
+     * a reference and target sequence based on a list of alignment positions.
+     * 
+     * Arguments:
+     *  - list: vector of Position structs defining aligned regions
+     *  - target: the target sequence string
+     *  - sor: optional offset to shift reference positions (default 0)
+     *  - fileName: optional output file to save the formatted result
+     * 
+     * Returns:
+     *  - the last Position from the input list
+     * 
+     * Functionality:
+     *  - Writes aligned regions as reference position ranges (adjusted by sor)
+     *  - Inserts unaligned/mismatched sequence fragments from target as-is
+     *  - Optionally saves the result to a file
+     * Dora writing
+     */
+    Position format_matches(const vector<Position>& list, const string& target,
                         int sor = 0, const string& fileName = "",bool local=true) {
-    string result;
-    int trouble_parts = 0, endRef = 0, endInTar = 0;
-    bool bad_Segment=false;
+        string result;
+        int trouble_parts = 0, endRef = 0, endInTar = 0;
+        bool bad_Segment=false;
 
-    for (size_t i = 0; i < list.size(); ++i) {
-        int startInTar = list[i].startInTar;
-        int startInRef = list[i].startInRef;
-        int endInRef = list[i].endInRef;
-        int endInTarCurr = list[i].endInTar;
+        for (size_t i = 0; i < list.size(); ++i) {
+            int startInTar = list[i].startInTar;
+            int startInRef = list[i].startInRef;
+            int endInRef = list[i].endInRef;
+            int endInTarCurr = list[i].endInTar;
 
-        if (i == 0) {
+            if (i == 0) {
+                endInTar = endInTarCurr;
+                endRef = max(endRef, endInRef);
+
+                if (startInTar > 0) {
+                    string pre_allign = target.substr(0, startInTar);
+                    result += pre_allign + "\n";    // we write the pre-aligned part
+                    trouble_parts += pre_allign.length();
+                }
+                result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";
+                continue;
+            }
+
+            int endInTarPrev = list[i - 1].endInTar;
+            string mismatch = target.substr(endInTarPrev + 1, startInTar - endInTarPrev - 1);   // mismatch part between two alignments	
+
+            if (!mismatch.empty()) {
+                result += mismatch + "\n";     // if there was a mismatched part we need to write it down
+                trouble_parts += mismatch.length();
+            }
+
+            result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";    // we write the aligned part
             endInTar = endInTarCurr;
             endRef = max(endRef, endInRef);
+        }
 
-            if (startInTar > 0) {
-                string pre_allign = target.substr(0, startInTar);
-                result += pre_allign + "\n";    // we write the pre-aligned part
-                trouble_parts += pre_allign.length();
+        // Optional: if alignment ends early, append the remainder of target
+        if (endInTar < static_cast<int>(target.length()) - 1) {
+            result += target.substr(endInTar + 1) + "\n";
+        }
+
+        // Optional: write to file
+        if (!fileName.empty()) {
+            ofstream out;
+            if(local){out.open(fileName, ios::app); }
+            else{out.open(fileName); }
+            if (out.is_open()) {
+                out << result <<"\n";
+                out.close();
+            } else {
+                cerr << "Could not open file: " << fileName << "\n";
             }
-            result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";
-            continue;
         }
 
-        int endInTarPrev = list[i - 1].endInTar;
-        string mismatch = target.substr(endInTarPrev + 1, startInTar - endInTarPrev - 1);   // mismatch part between two alignments	
-
-        if (!mismatch.empty()) {
-            result += mismatch + "\n";     // if there was a mismatched part we need to write it down
-            trouble_parts += mismatch.length();
-        }
-
-        result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";    // we write the aligned part
-        endInTar = endInTarCurr;
-        endRef = max(endRef, endInRef);
-    }
-
-    // Optional: if alignment ends early, append the remainder of target
-    if (endInTar < static_cast<int>(target.length()) - 1) {
-        result += target.substr(endInTar + 1) + "\n";
-    }
-
-    // Optional: write to file
-    if (!fileName.empty()) {
-        ofstream out;
-        if(local){out.open(fileName, ios::app); }
-        else{out.open(fileName); }
-        if (out.is_open()) {
-            out << result <<"\n";
-            out.close();
+        //logic for mismatch counter
+        cout<< "\ntrouble parts : "<< trouble_parts << " target_size \n" << target.size() << endl;
+        if (trouble_parts > (target.size() * bad_segment_treshold)) {
+            consec_bad_segments++;
+            cout << "BAD SEGMENT if there are multiple consecutive go global, consecutive bad segments " << consec_bad_segments<< endl;
         } else {
-            cerr << "Could not open file: " << fileName << "\n";
+            consec_bad_segments=0;
+            cout<<"Consecutive bad segments " << consec_bad_segments<< endl;
         }
+
+        return list.back(); // return the last Position
     }
-
-    //logic for mismatch counter
-    cout<< "\ntrouble parts : "<< trouble_parts << " target_size \n" << target.size() << endl;
-    if (trouble_parts > (target.size() * bad_segment_treshold)) {
-        consec_bad_segments++;
-        cout << "BAD SEGMENT if there are multiple consecutive go global, consecutive bad segments " << consec_bad_segments<< endl;
-    } else {
-        consec_bad_segments=0;
-        cout<<"Consecutive bad segments " << consec_bad_segments<< endl;
-    }
-
-    return list.back(); // return the last Position
-}
-
 
 };
+
+void postProcess(const string& inFile, const string& outFile) {
+    ifstream in(inFile);
+    ofstream out(outFile, ios::app);
+    vector<pair<int,int>> segs;
+    string line;
+    int prevEnd = 0;
+
+    auto flushSegs = [&](){
+        for (auto &s : segs) {
+            int b = s.first, e = s.second;
+            int deltaB = prevEnd == 0 ? b : (b - prevEnd);
+            int len    = e - b;
+            out << deltaB << "," << len << "\n";
+            prevEnd = b + len;
+        }
+        segs.clear();
+    };
+
+    while (getline(in, line)) {
+        if (line.empty()) continue;
+
+        if (line.find(',') != string::npos) {
+            // parsiraj start,end i samo ga spajaj u segs
+            int b,e; char c;
+            istringstream iss(line);
+            iss >> b >> c >> e;
+            if (!segs.empty() && segs.back().second + 1 == b) {
+                segs.back().second = e;
+            } else {
+                segs.emplace_back(b,e);
+            }
+
+        } else {
+            // mismatch-linija: prije ispisa očisti segmente
+            flushSegs();
+            // ispiši mismatch i resetiraj prevEnd
+            out << line << "\n";
+            prevEnd = 0;
+        }
+    }
+
+    // na kraju ispiši još preostale segmente
+    flushSegs();
+}
+
 int main() {
     // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
 
@@ -511,20 +557,32 @@ int main() {
     cleaner.close();
     ofstream cleaner2("global_matches_output.txt");
     cleaner2.close();
+    
+    const string tempFile  = "interim.txt";
+    const string finalFile = "final.txt";
+    ofstream(tempFile).close();      // reset privremenu
+    ofstream(finalFile).close();     // reset konačnu
+
+
     SCCGC reader;
     const int kmer_length = 3;
     const int block_size = 16;
+    auto local = true;
+    string meta;
+    int line_length;
+    string Llist, Nlist;
     try {
         string sequence = reader.LocReadSeq("sekvenca_ref.txt");  
         cout << "Meta data: " << reader.meta_data << endl;
         cout << "Local sequence read: " << sequence << endl;
         string sequence_ref = reader.GloReadRefSeq("sekvenca_ref.txt");  
         cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
-        string sequence_tar = reader.GloReadTarSeq("sekvenca_tar.txt", "output.txt");
+        string sequence_tar = reader.GloReadTarSeq("sekvenca_tar.txt", "output.txt", meta, line_length, Llist, Nlist);
         cout << "Target sequence: " << sequence_tar <<" size "  << sequence_tar.size()<< endl;
         cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
+        reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
 
         cout << "=== Lokalna podudaranja ===\n";
         for (size_t i = 0; i < min(refBlocks.size(), tarBlocks.size()); ++i) {    // check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  provjeri jel ok ? 
@@ -536,24 +594,35 @@ int main() {
                 cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
                      << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
             }
-            Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], 0, "local_matches_output.txt");
+            Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], 0, tempFile, true);
             if(reader.consec_bad_segments >= reader.consecutive_bad_segment_tresh){
                 cout << "moramo prec na globalno, ne idemo dalje lokalno"<< endl;
+                local = false;
                 break;
             }
             
         }
-        cout << "\n=== Globalna podudaranja ===\n";
-        reader.globalHash.clear();
-        auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
-        cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
-        for (auto &m : globalMatches) {
-            cout << "Ref[" << m.startInRef << "-" << m.endInRef
-                 << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
+        if(local) {
+            postProcess(tempFile, finalFile);
+        } else {
+            ofstream(tempFile).close();
+            reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
+            cout << "\n=== Globalna podudaranja ===\n";
+            reader.globalHash.clear();
+            auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
+            cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
+            for (auto &m : globalMatches) {
+                cout << "Ref[" << m.startInRef << "-" << m.endInRef
+                    << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
+            }
+            Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, 0, tempFile);
+            postProcess(tempFile, finalFile); //ja
         }
-
-        Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, 0, "global_matches_output.txt");
-
+        cout << "Meta: " << meta;
+        cout << "Length: " << line_length;
+        cout << "L list: " << Llist;
+        cout << "N list: " << Nlist;
+        
         
     } catch (const exception& e) {
         cerr << "Greška: " << e.what() << endl;
