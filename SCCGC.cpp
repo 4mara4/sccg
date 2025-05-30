@@ -628,7 +628,7 @@ int main() {
 
     SCCGC reader;
     const int kmer_length = 3;
-    const int block_size = 20;
+    const int block_size = 16;
     auto local = true;
     string meta;
     int line_length;
