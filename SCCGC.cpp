@@ -620,6 +620,8 @@ int main() {
     
     const string tempFile  = "interim.txt";
     const string finalFile = "final.txt";
+    const string refFile="test\\sekvenca_ref1.txt";
+    const string tarFile="test\\sekvenca_tar1.txt";
     ofstream(tempFile).close();      // reset privremenu
     ofstream(finalFile).close();     // reset konačnu
 
@@ -632,12 +634,12 @@ int main() {
     int line_length;
     string Llist, Nlist;
     try {
-        string sequence = reader.LocReadSeq("sekvenca_ref3.txt");  
+        string sequence = reader.LocReadSeq(refFile);  
         cout << "Meta data: " << reader.meta_data << endl;
         cout << "Local sequence read: " << sequence << endl;
-        string sequence_ref = reader.GloReadRefSeq("sekvenca_ref3.txt");  
+        string sequence_ref = reader.GloReadRefSeq(refFile);  
         cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
-        string sequence_tar = reader.GloReadTarSeq("sekvenca_tar3.txt", "output.txt", meta, line_length, Llist, Nlist);
+        string sequence_tar = reader.GloReadTarSeq(tarFile, "output.txt", meta, line_length, Llist, Nlist);
         cout << "Target sequence: " << sequence_tar <<" size "  << sequence_tar.size()<< endl;
         cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);

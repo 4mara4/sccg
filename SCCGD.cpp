@@ -188,11 +188,10 @@ public:
             if (i > 0 && i % lineLen == 0) out << "\n";
             out << seq[i];
         }
-        out << "\n";
     }
 
     void run() {
-        const string refFile = "sekvenca_ref3.txt";
+        const string refFile = "test\\sekvenca_ref1.txt";
         const string outFile = "output.fa";
         const string finalFile="final.txt";
 
