@@ -192,7 +192,7 @@ public:
     }
 
     void run() {
-        const string refFile = "sekvenca_ref.txt";
+        const string refFile = "sekvenca_ref3.txt";
         const string outFile = "output.fa";
         const string finalFile="final.txt";
 

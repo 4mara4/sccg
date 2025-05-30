@@ -357,6 +357,24 @@ public:
         return blocks;
     }
 
+    /**
+     * @brief Finds local alignments between a reference block and a target block.
+     *
+     * This function scans the target sequence one k-mer at a time. For each k-mer,
+     * it looks up all matching positions in the localHash of the reference.
+     * It then extends the match forward as long as the bases remain identical,
+     * chooses the best (longest, or earliest) match, and records its start/end
+     * coordinates in both reference and target. Matched regions are skipped over
+     * so they are not re-examined, ensuring each position is aligned at most once.
+     *
+     * @param reference    A substring of the reference to search within.
+     * @param target       A substring of the target to align.
+     * @param kmer_length  Length of each k-mer used for initial matching.
+     * @return A vector of Position structs defining the aligned segments.
+     *
+     * Dora + Marija writing
+     */
+
     vector<Position> localMatch(const string& reference,
                             const string& target,
                             int kmer_length) {
@@ -392,6 +410,24 @@ public:
         }
         return matches;
     }
+
+    /**
+     * @brief Finds global alignments between the full reference and target sequences.
+     *
+     * This function first builds a hash of all k-mers over the entire reference.
+     * It then scans the target sequence one k-mer at a time, looking up each k-mer
+     * in the reference hash. For each match, it extends forward as far as the bases
+     * remain identical, selects the longest (or earliest on tie) extension, and records
+     * its start/end coordinates in both reference and target. Matched regions are skipped
+     * so that each target position is aligned only once.
+     *
+     * @param ref   The full reference sequence.
+     * @param tar   The full target sequence to align against the reference.
+     * @param klen  Length of each k-mer used for seeding matches.
+     * @return      A vector of Position structs describing all alignment segments.
+     *
+     * Dora + Marija writing
+     */
 
      vector<Position> globalMatch(const string& ref, const string& tar, int klen) {
         createGlobalHash(ref, klen);
@@ -436,6 +472,13 @@ public:
      */
     Position format_matches(const vector<Position>& list, const string& target,
                         int sor = 0, const string& fileName = "",bool local=true) {
+        if(list.empty()) {
+            if(!fileName.empty()) {
+                ofstream out(fileName, ios::app);
+                if (out) out << target << "\n\n";
+            }
+            return Position{0,0,0,0};
+        }
         string result;
         int trouble_parts = 0, endRef = 0, endInTar = 0;
         bool bad_Segment=false;
@@ -503,52 +546,69 @@ public:
         return list.back(); // return the last Position
     }
 
-};
+    /**
+     * @brief Post-processes alignment data into delta-encoded segments.
+     *
+     * This function reads the input file `inFile` line by line, where aligned regions
+     * and mismatches are mixed in the following format:
+     *   - Lines with "start,end" specify aligned segments.
+     *   - Lines without a comma represent literal mismatch sequences.
+     *
+     * Adjacent aligned segments (where the end of one segment + 1 == start of the next)
+     * are merged into a single continuous segment. For each merged segment, it outputs:
+     *   deltaB,len
+     * where:
+     *   - deltaB = the segment’s start position minus the end position of the previous segment
+     *              (or the segment’s start if there is no previous segment),
+     *   - len    = the length of the segment (end − start + 1).
+     * Mismatch lines are passed through unchanged.
+     *
+     * @param inFile  Path to the interim file containing raw alignments (e.g., "interim.txt").
+     * @param outFile Path to the final output file where delta-encoded segments and
+     *                mismatch lines will be appended.
+     *
+     * Dora + Marija writing
+     */
+    void postProcess(const string& inFile, const string& outFile) {
+        ifstream in(inFile);
+        ofstream out(outFile, ios::app);
+        vector<pair<int,int>> segs;
+        string line;
+        int prevEnd = 0;
 
-void postProcess(const string& inFile, const string& outFile) {
-    ifstream in(inFile);
-    ofstream out(outFile, ios::app);
-    vector<pair<int,int>> segs;
-    string line;
-    int prevEnd = 0;
-
-    auto flushSegs = [&](){
-        for (auto &s : segs) {
-            int b = s.first, e = s.second;
-            int deltaB =b - prevEnd + 1;
-            if(prevEnd ==0 ) {deltaB--;}
-            int len    = e - b + 1;
-            out << deltaB << "," << len << "\n";
-            prevEnd = b + len;
-        }
-        segs.clear();
-    };
-
-    while (getline(in, line)) {
-        if (line.empty()) continue;
-
-        if (line.find(',') != string::npos) {
-            // parsiraj start,end i samo ga spajaj u segs
-            int b,e; char c;
-            istringstream iss(line);
-            iss >> b >> c >> e;
-            if (!segs.empty() && segs.back().second + 1 == b) {
-                segs.back().second = e;
-            } else {
-                segs.emplace_back(b,e);
+        auto flushSegs = [&](){
+            for (auto &s : segs) {
+                int b = s.first, e = s.second;
+                int deltaB =b - prevEnd + 1;
+                if(prevEnd ==0 ) {deltaB--;}
+                int len    = e - b + 1;
+                out << deltaB << "," << len << "\n";
+                prevEnd = b + len;
             }
+            segs.clear();
+        };
 
-        } else {
-            // mismatch-linija: prije ispisa očisti segmente
-            flushSegs();
-            // ispiši mismatch i resetiraj prevEnd
-            out << line << "\n";
+        while (getline(in, line)) {
+            if (line.empty()) continue;
+
+            if (line.find(',') != string::npos) {
+                // parsiraj start,end i samo ga spajaj u segs
+                int b,e; char c;
+                istringstream iss(line);
+                iss >> b >> c >> e;
+                if (!segs.empty() && segs.back().second + 1 == b) {
+                    segs.back().second = e;
+                } else {
+                    segs.emplace_back(b,e);
+                }
+            } else {
+                flushSegs();
+                out << line << "\n";
+            }
         }
+        flushSegs();
     }
-
-    // na kraju ispiši još preostale segmente
-    flushSegs();
-}
+};
 
 int main() {
     // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
@@ -566,23 +626,24 @@ int main() {
 
     SCCGC reader;
     const int kmer_length = 3;
-    const int block_size = 16;
+    const int block_size = 20;
     auto local = true;
     string meta;
     int line_length;
     string Llist, Nlist;
     try {
-        string sequence = reader.LocReadSeq("sekvenca_ref.txt");  
+        string sequence = reader.LocReadSeq("sekvenca_ref3.txt");  
         cout << "Meta data: " << reader.meta_data << endl;
         cout << "Local sequence read: " << sequence << endl;
-        string sequence_ref = reader.GloReadRefSeq("sekvenca_ref.txt");  
+        string sequence_ref = reader.GloReadRefSeq("sekvenca_ref3.txt");  
         cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
-        string sequence_tar = reader.GloReadTarSeq("sekvenca_tar.txt", "output.txt", meta, line_length, Llist, Nlist);
+        string sequence_tar = reader.GloReadTarSeq("sekvenca_tar3.txt", "output.txt", meta, line_length, Llist, Nlist);
         cout << "Target sequence: " << sequence_tar <<" size "  << sequence_tar.size()<< endl;
         cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
         reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
+        // reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
 
         cout << "=== Lokalna podudaranja ===\n";
         for (size_t i = 0; i < min(refBlocks.size(), tarBlocks.size()); ++i) {    // check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  provjeri jel ok ? 
@@ -602,8 +663,9 @@ int main() {
             }
             
         }
+
         if(local) {
-            postProcess(tempFile, finalFile);
+            reader.postProcess(tempFile, finalFile);
         } else {
             ofstream(tempFile).close();
             reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
@@ -616,7 +678,7 @@ int main() {
                     << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
             }
             Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, 0, tempFile);
-            postProcess(tempFile, finalFile); //ja
+            reader.postProcess(tempFile, finalFile); //ja
         }
         cout << "Meta: " << meta;
         cout << "Length: " << line_length;
