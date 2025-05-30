@@ -515,8 +515,9 @@ void postProcess(const string& inFile, const string& outFile) {
     auto flushSegs = [&](){
         for (auto &s : segs) {
             int b = s.first, e = s.second;
-            int deltaB = prevEnd == 0 ? b : (b - prevEnd);
-            int len    = e - b;
+            int deltaB =b - prevEnd + 1;
+            if(prevEnd ==0 ) {deltaB--;}
+            int len    = e - b + 1;
             out << deltaB << "," << len << "\n";
             prevEnd = b + len;
         }
@@ -542,7 +543,6 @@ void postProcess(const string& inFile, const string& outFile) {
             flushSegs();
             // ispiši mismatch i resetiraj prevEnd
             out << line << "\n";
-            prevEnd = 0;
         }
     }
 

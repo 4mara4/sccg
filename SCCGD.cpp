@@ -10,45 +10,74 @@ struct Position {
     int start;
     int end;
 };
+ostream& operator<<(ostream& os, const Position& pos) {
+    os << "[" << pos.start << ", " << pos.end << "]";
+    return os;
+}
+
+ostream& operator<<(ostream& os, const vector<Position>& v) {
+    os << "{ ";
+    for (const auto& p : v) {
+        os << p << " ";
+    }
+    os << "}";
+    return os;
+}
+
 
 class SCCGD {
 public:
-    // Parsira preambulu iz interim.txt
-    void parsePreproc(const string& interim,
-                      string& meta,
-                      int& lineLen,
-                      vector<Position>& L_list,
-                      vector<Position>& N_list) {
-        ifstream in(interim);
-        if (!in) throw runtime_error("Ne mogu otvoriti " + interim);
+    string meta;
+    int lineLen;
+    vector<Position> L_list, N_list;
+
+    // Parsira preambulu iz final.txt
+    void parsePreproc(const string& final) {
+        ifstream in(final);
+        if (!in) throw runtime_error("Ne mogu otvoriti " + final);
+
         string line;
         int stage = 0;
         while (getline(in, line)) {
             if (stage == 0) {
                 meta = line + "\n";
+                cout << "meta " << meta << endl;
                 stage++;
             } else if (stage == 1) {
                 lineLen = stoi(line);
+                cout << "Line length  " << lineLen << endl;
                 stage++;
             } else if (stage == 2 || stage == 3) {
                 if (line.empty()) {
                     stage++;
                     continue;
                 }
+
                 istringstream iss(line);
-                int prev = 0, offset, length;
-                auto &list = (stage == 2 ? L_list : N_list);
-                while (iss >> offset >> length) {
-                    list.push_back({prev + offset,
-                                    prev + offset + length});
-                    prev = list.back().end;
+                string token;
+                int prev = 0;
+                auto& list = (stage == 2 ? L_list : N_list);
+
+                while (iss >> token) {
+                    size_t colon = token.find(':');
+                    if (colon == string::npos) continue;
+
+                    int offset = stoi(token.substr(0, colon));
+                    int length = stoi(token.substr(colon + 1));
+                    int start = prev + offset;
+                    int end = start + length - 1;
+
+                    list.push_back({start, end});
+                    prev = end + 1;
                 }
+
                 stage++;
             } else {
                 break;
             }
         }
     }
+
 
     // Čita referencu iz FASTA (preskače header)
     string readSeq(const string& path) {
@@ -74,10 +103,10 @@ public:
 }
 
     // Rekonstruira sirovu sekvencu iz delta-podataka final.txt i reference
-    string reconstruct(const string& interim,
+    string reconstruct(const string& final,
                        const string& ref) {
-        ifstream in(interim);
-        if (!in) throw runtime_error("Ne mogu otvoriti " + interim);
+        ifstream in(final);
+        if (!in) throw runtime_error("Ne mogu otvoriti " + final);
 
         string line;
         int count = 0;
@@ -86,33 +115,33 @@ public:
 
         while (getline(in, line)) {
             ++count;
-            // Preskači header, lineLen, L-list, N-list i prazan red (5 redova)
-            if (count <= 5) continue;
+            // Preskači header, lineLen, L-list, N-list
+            if (count <= 4) continue;
             if (line.empty()) continue;
 
             auto comma = line.find(',');
             if (comma != string::npos) {
                 // delta,len
                 int delta = stoi(line.substr(0, comma));
-                int len   = stoi(line.substr(comma + 1)) - delta;
-                cout << "Len: " << len;
+                int len   = stoi(line.substr(comma + 1));
+                
                 int b     = prevEnd + delta;
-                int e     = b + len;  // len = e-b
-                cout << "b " << b;
-                cout << "e " << e;
-                if (b < 0 || e >= (int)ref.size()) {
-                    throw runtime_error("Error: segment izvan ref granica: " +
+                int e     = b + len - 1;  // len = e-b
+                /* cout << "  b " << b;
+                cout << "  Len:   " << len;
+                cout << "  e " << e << endl; */
+                if (b < 0 || e > (int)ref.size()) {
+                    throw runtime_error("  Error: segment izvan ref granica: " +
                                         to_string(delta) + "+" +
                                         to_string(len) + " > " +
                                         to_string((int)ref.size()));
                 }
-                out += ref.substr(b, len + 1); // len+1 baza
+                out += ref.substr(b, len); 
                 prevEnd = e;
             }
             else {
                 // literal mismatch
                 out += line;
-                prevEnd = 0;
             }
         }
         return out;
@@ -128,7 +157,7 @@ public:
                 out.push_back(raw[rawIdx++]);
                 pos++;
             }
-            for (int i = p.start; i < p.end; ++i) {
+            for (int i = p.start; i <= p.end; ++i) {
                 out.push_back('N');
                 pos++;
             }
@@ -142,7 +171,7 @@ public:
     void applyLower(const vector<Position>& L_list,
                     string& seq) {
         for (auto& p : L_list) {
-            for (int i = p.start; i < p.end && i < (int)seq.size(); ++i)
+            for (int i = p.start; i <= p.end && i < (int)seq.size(); ++i)
                 seq[i] = tolower(seq[i]);
         }
     }
@@ -164,21 +193,18 @@ public:
 
     void run() {
         const string refFile = "sekvenca_ref.txt";
-        const string interim = "interim.txt";
         const string outFile = "output.fa";
-
-        string meta;
-        int lineLen;
-        vector<Position> L_list, N_list;
+        const string finalFile="final.txt";
 
         // 1) Parsiraj preambulu
-        parsePreproc(interim, meta, lineLen, L_list, N_list);
-
+        parsePreproc(finalFile);
+        cout << "l list " << L_list << endl;
+        cout << "n list " << N_list << endl;
         // 2) Učitaj referencu
         string refSeq = readSeq(refFile);
 
         // 3) Rekonstruiraj raw
-        string raw = reconstruct(interim, refSeq);
+        string raw = reconstruct(finalFile, refSeq);
 
         // 4) Ubaci N-regije
         string withNs = N_list.empty() ? raw : insertNs(raw, N_list);
