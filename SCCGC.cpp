@@ -470,8 +470,7 @@ public:
      *  - Optionally saves the result to a file
      * Dora writing
      */
-    Position format_matches(const vector<Position>& list, const string& target,
-                        int sor = 0, const string& fileName = "",bool local=true) {
+    Position format_matches(const vector<Position>& list, const string& target, const string& fileName = "",bool local=true) {
         if(list.empty()) {
             if(!fileName.empty()) {
                 ofstream out(fileName, ios::app);
@@ -498,7 +497,7 @@ public:
                     result += pre_allign + "\n";    // we write the pre-aligned part
                     trouble_parts += pre_allign.length();
                 }
-                result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";
+                result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";
                 continue;
             }
 
@@ -510,7 +509,7 @@ public:
                 trouble_parts += mismatch.length();
             }
 
-            result += to_string(startInRef + sor) + "," + to_string(endInRef + sor) + "\n";    // we write the aligned part
+            result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";    // we write the aligned part
             endInTar = endInTarCurr;
             endRef = max(endRef, endInRef);
         }
@@ -526,7 +525,7 @@ public:
             if(local){out.open(fileName, ios::app); }
             else{out.open(fileName); }
             if (out.is_open()) {
-                out << result <<"\n";
+                out << result ;
                 out.close();
             } else {
                 cerr << "Could not open file: " << fileName << "\n";
@@ -644,7 +643,7 @@ int main() {
         cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
-        reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
+        reader.writePreamble(tempFile, meta, line_length, Llist, Nlist);
         // reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
 
         cout << "=== Lokalna podudaranja ===\n";
@@ -652,12 +651,13 @@ int main() {
             reader.createLocalHash(refBlocks[i], kmer_length);
             vector<Position> localMatches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
 
-            cout << "\nBlock " << i << ": Pronadeno " << localMatches.size() << " podudaranja\n";
+            cout << "\nBlock " << i  <<"  " << tarBlocks[i] << ": Pronadeno " << localMatches.size() << " podudaranja\n";
+            cout << "ref blok " << refBlocks[i] <<endl;
             for (auto &m : localMatches) {
                 cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
                      << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
             }
-            Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], 0, tempFile, true);
+            Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], tempFile, true);
             if(reader.consec_bad_segments >= reader.consecutive_bad_segment_tresh){
                 cout << "moramo prec na globalno, ne idemo dalje lokalno"<< endl;
                 local = false;
@@ -679,7 +679,7 @@ int main() {
                 cout << "Ref[" << m.startInRef << "-" << m.endInRef
                     << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
             }
-            Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, 0, tempFile);
+            Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, tempFile);
             reader.postProcess(tempFile, finalFile); //ja
         }
         cout << "Meta: " << meta;

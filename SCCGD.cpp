@@ -204,6 +204,7 @@ public:
 
         // 3) Rekonstruiraj raw
         string raw = reconstruct(finalFile, refSeq);
+        cout << raw <<endl;
 
         // 4) Ubaci N-regije
         string withNs = N_list.empty() ? raw : insertNs(raw, N_list);
