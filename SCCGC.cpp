@@ -644,9 +644,12 @@ public:
     }
 };
 
-int main() {
+int main(int argc, char* argv[]) {
     // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
-
+    if (argc != 3) {
+        std::cerr << "Upotreba: " << argv[0] << " <tar file name> <ref file name\n";
+        return 1;
+    }
     ofstream cleaner("local_matches_output.txt");
     cleaner.close();
     ofstream cleaner2("global_matches_output.txt");
@@ -654,10 +657,8 @@ int main() {
     
     const string tempFile  = "interim.txt";
     const string finalFile = "final.txt";
-    //const string refFile="chr1_ref.fa";
-    //const string tarFile="chr1_tar.fa";
-    const string refFile="chr18ref.fa";
-    const string tarFile="chr18tar.fa";
+    const string refFile="test//" + string(argv[2]);
+    const string tarFile="test//" + string(argv[1]);
     ofstream(tempFile).close();      // reset privremenu
     ofstream(finalFile).close();     // reset konačnu
 

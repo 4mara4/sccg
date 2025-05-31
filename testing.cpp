@@ -34,10 +34,14 @@ bool files_are_equal(const std::string& path1, const std::string& path2) {
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        std::cerr << "Upotreba: " << argv[0] << " <tar file>\n";
+        return 1;
+    }
         try {
             // string path1="chr1_tar.fa";
-            string path1="test\\sekvenca_tar3.txt";
+            string path1="test//" + string(argv[1]);
 
             string path2= "output.fa";
             bool same = files_are_equal(path1,path2);

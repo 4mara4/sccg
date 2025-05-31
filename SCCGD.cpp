@@ -198,9 +198,7 @@ public:
         }
     }
 
-    void run() {
-        //const string refFile = "chr20_ref.fa";
-        const string refFile="chr18ref.fa";
+    void run(string refFile) {
 
         const string outFile = "output.fa";
         const string finalFile="final.txt";
@@ -237,10 +235,16 @@ public:
     }
 };
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        std::cerr << "Upotreba: " << argv[0] << " <ref file name>\n";
+        return 1;
+        }
+    
     try {
+        const string refFile="test//" + string(argv[1]);
         SCCGD decompressor;
-        decompressor.run();
+        decompressor.run(refFile);
     } catch (const exception& e) {
         cerr << e.what() << "\n";
         return 1;
