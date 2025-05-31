@@ -656,15 +656,15 @@ int main() {
     const string finalFile = "final.txt";
     //const string refFile="chr1_ref.fa";
     //const string tarFile="chr1_tar.fa";
-    const string refFile="test\\sekvenca_ref3.txt";
-    const string tarFile="test\\sekvenca_tar3.txt";
+    const string refFile="test/sekvenca_ref1.txt";
+    const string tarFile="test/sekvenca_tar1.txt";
     ofstream(tempFile).close();      // reset privremenu
     ofstream(finalFile).close();     // reset konačnu
 
 
     SCCGC reader;
-    const int kmer_length = 21;
-    const int block_size = 30000;
+    const int kmer_length = 3;
+    const int block_size = 20;
     auto local = true;
     string meta;
     int line_length;
@@ -688,6 +688,12 @@ int main() {
         for (size_t i = 0; i < min(refBlocks.size(), tarBlocks.size()); ++i) {    // check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  provjeri jel ok ? 
             reader.createLocalHash(refBlocks[i], kmer_length);
             vector<Position> localMatches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
+
+            int block_offset = static_cast<int>(i) * block_size;
+            for (auto &m : localMatches) {
+                m.startInRef += block_offset;
+                m.endInRef   += block_offset;
+            }
 
             cout << "\nBlock " << i  << ": Pronadeno " << localMatches.size() << " podudaranja\n";
             //cout << "ref blok " << refBlocks[i] <<endl;

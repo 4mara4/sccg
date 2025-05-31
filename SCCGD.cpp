@@ -200,7 +200,7 @@ public:
 
     void run() {
         //const string refFile = "chr20_ref.fa";
-        const string refFile="test\\sekvenca_ref3.txt";
+        const string refFile="test/sekvenca_ref1.txt";
 
         const string outFile = "output.fa";
         const string finalFile="final.txt";

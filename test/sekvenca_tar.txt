@@ -1,1 +1,2 @@
-TACGNNNGAtCaA
+>chromosome_1
+AAAATTTT
