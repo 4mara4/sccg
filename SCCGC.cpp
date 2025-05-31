@@ -429,27 +429,62 @@ public:
      * Dora + Marija writing
      */
 
-     vector<Position> globalMatch(const string& ref, const string& tar, int klen) {
+    vector<Position> globalMatch(const string& ref, const string& tar, int klen, int limit=100) {
         createGlobalHash(ref, klen);
         vector<Position> out;
-        int idx=0;
+        int idx = 0;
+        int lastEIR = 0; 
+
         while (idx + klen <= tar.size()) {
-            string k=tar.substr(idx,klen);
-            size_t h=hash<string>{}(k);
+            string k = tar.substr(idx, klen);
+            size_t h = hash<string>{}(k);
             if (!globalHash.count(h)) { idx++; continue; }
-            int bestS=INT_MAX, bestE=0;
-            for (auto &km: globalHash[h]) if (km.getKmer()==k) {
-                int ext=0, r=km.getStart()+klen, t=idx+klen;
-                while (r<ref.size()&&t<tar.size()&&ref[r]==tar[t]){ext++;r++;t++;}
-                if (ext>bestE||(ext==bestE&&km.getStart()<bestS)) {bestE=ext;bestS=km.getStart();}
+
+            int bestS = INT_MAX, bestE = 0;
+            bool foundInLimit = false; 
+
+            for (auto &km : globalHash[h]) {
+                if (km.getKmer() != k) continue;
+
+                
+                if (!out.empty() && abs(km.getStart() - lastEIR) > limit) continue;
+
+                int ext = 0, r = km.getStart() + klen, t = idx + klen;
+                while (r < ref.size() && t < tar.size() && ref[r] == tar[t]) { ext++; r++; t++; }
+
+                if (ext > bestE || (ext == bestE && km.getStart() < bestS)) {
+                    bestE = ext;
+                    bestS = km.getStart();
+                    foundInLimit = true;
+                }
             }
-            if (bestS!=INT_MAX) {
-                out.push_back({bestS, bestS+klen+bestE-1, idx, idx+klen+bestE-1});
-                idx += klen+bestE;   // check later if this is correct
-            } else idx++;
+
+            if (!foundInLimit) {
+                for (auto &km : globalHash[h]) {
+                    if (km.getKmer() != k) continue;
+
+                    int ext = 0, r = km.getStart() + klen, t = idx + klen;
+                    while (r < ref.size() && t < tar.size() && ref[r] == tar[t]) { ext++; r++; t++; }
+
+                    if (ext > bestE || (ext == bestE && km.getStart() < bestS)) {
+                        bestE = ext;
+                        bestS = km.getStart();
+                    }
+                }
+            }
+
+            if (bestS != INT_MAX) {
+                out.push_back({bestS, bestS + klen + bestE - 1, idx, idx + klen + bestE - 1});
+                lastEIR = bestS + klen + bestE - 1; 
+                idx += klen + bestE + 1;
+            } else {
+                idx++;
+            }
         }
+
         return out;
     }
+
 
     /*
      * format_matches: Formats and outputs aligned and unaligned segments between
@@ -619,15 +654,17 @@ int main() {
     
     const string tempFile  = "interim.txt";
     const string finalFile = "final.txt";
-    const string refFile="test\\sekvenca_ref1.txt";
-    const string tarFile="test\\sekvenca_tar1.txt";
+    //const string refFile="chr1_ref.fa";
+    //const string tarFile="chr1_tar.fa";
+    const string refFile="test\\sekvenca_ref3.txt";
+    const string tarFile="test\\sekvenca_tar3.txt";
     ofstream(tempFile).close();      // reset privremenu
     ofstream(finalFile).close();     // reset konačnu
 
 
     SCCGC reader;
-    const int kmer_length = 3;
-    const int block_size = 16;
+    const int kmer_length = 21;
+    const int block_size = 30000;
     auto local = true;
     string meta;
     int line_length;
@@ -635,11 +672,12 @@ int main() {
     try {
         string sequence = reader.LocReadSeq(refFile);  
         cout << "Meta data: " << reader.meta_data << endl;
-        cout << "Local sequence read: " << sequence << endl;
+        //cout << "Local sequence read: " << sequence << endl;
         string sequence_ref = reader.GloReadRefSeq(refFile);  
-        cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
+        //cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
         string sequence_tar = reader.GloReadTarSeq(tarFile, "output.txt", meta, line_length, Llist, Nlist);
-        cout << "Target sequence: " << sequence_tar <<" size "  << sequence_tar.size()<< endl;
+        //cout << "Target sequence size "  << sequence_tar.size()<< endl;
+        
         cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
@@ -651,8 +689,8 @@ int main() {
             reader.createLocalHash(refBlocks[i], kmer_length);
             vector<Position> localMatches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
 
-            cout << "\nBlock " << i  <<"  " << tarBlocks[i] << ": Pronadeno " << localMatches.size() << " podudaranja\n";
-            cout << "ref blok " << refBlocks[i] <<endl;
+            cout << "\nBlock " << i  << ": Pronadeno " << localMatches.size() << " podudaranja\n";
+            //cout << "ref blok " << refBlocks[i] <<endl;
             for (auto &m : localMatches) {
                 cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
                      << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";

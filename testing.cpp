@@ -36,7 +36,9 @@ bool files_are_equal(const std::string& path1, const std::string& path2) {
 
 int main() {
         try {
-            string path1="test\\sekvenca_tar1.txt";
+            // string path1="chr1_tar.fa";
+            string path1="test\\sekvenca_tar3.txt";
+
             string path2= "output.fa";
             bool same = files_are_equal(path1,path2);
             if (same) {

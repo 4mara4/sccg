@@ -191,20 +191,22 @@ public:
     }
 
     void run() {
-        const string refFile = "test\\sekvenca_ref1.txt";
+        //const string refFile = "chr1_ref.fa";
+        const string refFile="test\\sekvenca_ref3.txt";
+
         const string outFile = "output.fa";
         const string finalFile="final.txt";
 
         // 1) Parsiraj preambulu
         parsePreproc(finalFile);
-        cout << "l list " << L_list << endl;
-        cout << "n list " << N_list << endl;
+        //cout << "l list " << L_list << endl;
+        //cout << "n list " << N_list << endl;
         // 2) Učitaj referencu
         string refSeq = readSeq(refFile);
 
         // 3) Rekonstruiraj raw
         string raw = reconstruct(finalFile, refSeq);
-        cout << raw <<endl;
+        //cout << raw <<endl;
 
         // 4) Ubaci N-regije
         string withNs = N_list.empty() ? raw : insertNs(raw, N_list);
