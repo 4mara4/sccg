@@ -6,6 +6,15 @@
 #include <stdexcept>
 using namespace std;
 
+/*   ON LINUX
+long long getCPUTime() {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
+        return static_cast<long long>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec; // nanosekunde
+    } else {
+        return 0LL;
+    }
+} */
 struct Position {
     int start;
     int end;
@@ -236,6 +245,7 @@ public:
 };
 
 int main(int argc, char* argv[]) {
+    // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
     if (argc != 2) {
         std::cerr << "Upotreba: " << argv[0] << " <ref file name>\n";
         return 1;
@@ -249,5 +259,8 @@ int main(int argc, char* argv[]) {
         cerr << e.what() << "\n";
         return 1;
     }
+    // long long end_time = getCPUTime();    UNCOMMENT ON LINUX
+    
+    // cout << "Execution time " << (end_time - start_time) << endl;  UNCOMMENT ON LINUX 
     return 0;
 }
