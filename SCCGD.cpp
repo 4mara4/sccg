@@ -148,22 +148,30 @@ public:
     }
 
     // Ubacuje N-regije
-    string insertNs(const string& raw,
-                    const vector<Position>& N_list) {
+   
+    string insertNs(const string& raw, const vector<Position>& N_list) {
         string out;
-        int rawIdx = 0, pos = 0;
-        for (auto& p : N_list) {
-            while (pos < p.start && rawIdx < (int)raw.size()) {
+        int rawIdx = 0;
+        int pos = 0;
+        size_t n = raw.size();
+
+        for (const auto& p : N_list) {
+            while (pos < p.start && rawIdx < (int)n) {
                 out.push_back(raw[rawIdx++]);
                 pos++;
             }
+
             for (int i = p.start; i <= p.end; ++i) {
                 out.push_back('N');
                 pos++;
             }
         }
-        while (rawIdx < (int)raw.size())
+
+        while (rawIdx < (int)n) {
             out.push_back(raw[rawIdx++]);
+            pos++;
+        }
+
         return out;
     }
 
@@ -191,7 +199,7 @@ public:
     }
 
     void run() {
-        //const string refFile = "chr1_ref.fa";
+        //const string refFile = "chr20_ref.fa";
         const string refFile="test\\sekvenca_ref3.txt";
 
         const string outFile = "output.fa";
@@ -208,8 +216,14 @@ public:
         string raw = reconstruct(finalFile, refSeq);
         //cout << raw <<endl;
 
+        refSeq.clear();
+        refSeq.shrink_to_fit();
+
         // 4) Ubaci N-regije
         string withNs = N_list.empty() ? raw : insertNs(raw, N_list);
+   
+        raw.clear();
+        raw.shrink_to_fit();
 
         // 5) Vraćanje lowercase
         applyLower(L_list, withNs);
@@ -217,6 +231,9 @@ public:
         // 6) Ispiši FASTA
         writeFasta(outFile, meta, withNs, lineLen);
         cout << "Reconstructed FASTA: " << outFile << "\n";
+
+        withNs.clear();
+        withNs.shrink_to_fit();
     }
 };
 
