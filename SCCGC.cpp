@@ -656,15 +656,15 @@ int main() {
     const string finalFile = "final.txt";
     //const string refFile="chr1_ref.fa";
     //const string tarFile="chr1_tar.fa";
-    const string refFile="test/sekvenca_ref1.txt";
-    const string tarFile="test/sekvenca_tar1.txt";
+    const string refFile="chr18ref.fa";
+    const string tarFile="chr18tar.fa";
     ofstream(tempFile).close();      // reset privremenu
     ofstream(finalFile).close();     // reset konačnu
 
 
     SCCGC reader;
-    const int kmer_length = 3;
-    const int block_size = 20;
+    const int kmer_length = 21;
+    const int block_size = 30000;
     auto local = true;
     string meta;
     int line_length;
