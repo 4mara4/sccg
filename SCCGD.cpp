@@ -50,11 +50,11 @@ public:
         while (getline(in, line)) {
             if (stage == 0) {
                 meta = line + "\n";
-                cout << "meta " << meta << endl;
+                //cout << "meta " << meta << endl;
                 stage++;
             } else if (stage == 1) {
                 lineLen = stoi(line);
-                cout << "Line length  " << lineLen << endl;
+                //cout << "Line length  " << lineLen << endl;
                 stage++;
             } else if (stage == 2 || stage == 3) {
                 if (line.empty()) {

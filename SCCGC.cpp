@@ -568,13 +568,13 @@ public:
         }
 
         //logic for mismatch counter
-        cout<< "\ntrouble parts : "<< trouble_parts << " target_size \n" << target.size() << endl;
+        //cout<< "\ntrouble parts : "<< trouble_parts << " target_size \n" << target.size() << endl;
         if (trouble_parts > (target.size() * bad_segment_treshold)) {
             consec_bad_segments++;
-            cout << "BAD SEGMENT if there are multiple consecutive go global, consecutive bad segments " << consec_bad_segments<< endl;
+            //cout << "BAD SEGMENT if there are multiple consecutive go global, consecutive bad segments " << consec_bad_segments<< endl;
         } else {
             consec_bad_segments=0;
-            cout<<"Consecutive bad segments " << consec_bad_segments<< endl;
+            //cout<<"Consecutive bad segments " << consec_bad_segments<< endl;
         }
 
         return list.back(); // return the last Position
@@ -672,14 +672,14 @@ int main(int argc, char* argv[]) {
     string Llist, Nlist;
     try {
         string sequence = reader.LocReadSeq(refFile);  
-        cout << "Meta data: " << reader.meta_data << endl;
+        //cout << "Meta data: " << reader.meta_data << endl;
         //cout << "Local sequence read: " << sequence << endl;
         string sequence_ref = reader.GloReadRefSeq(refFile);  
         //cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
         string sequence_tar = reader.GloReadTarSeq(tarFile, "output.txt", meta, line_length, Llist, Nlist);
         //cout << "Target sequence size "  << sequence_tar.size()<< endl;
         
-        cout << "block size " << block_size << endl;
+        //cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
         reader.writePreamble(tempFile, meta, line_length, Llist, Nlist);
@@ -696,12 +696,12 @@ int main(int argc, char* argv[]) {
                 m.endInRef   += block_offset;
             }
 
-            cout << "\nBlock " << i  << ": Pronadeno " << localMatches.size() << " podudaranja\n";
-            //cout << "ref blok " << refBlocks[i] <<endl;
+            /*cout << "\nBlock " << i  << ": Pronadeno " << localMatches.size() << " podudaranja\n";
+            cout << "ref blok " << refBlocks[i] <<endl;
             for (auto &m : localMatches) {
                 cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
                      << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
-            }
+            }*/
             Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], tempFile, true);
             if(reader.consec_bad_segments >= reader.consecutive_bad_segment_tresh){
                 cout << "moramo prec na globalno, ne idemo dalje lokalno"<< endl;
@@ -719,18 +719,18 @@ int main(int argc, char* argv[]) {
             cout << "\n=== Globalna podudaranja ===\n";
             reader.globalHash.clear();
             auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
-            cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
-            for (auto &m : globalMatches) {
+            //cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
+            /*for (auto &m : globalMatches) {
                 cout << "Ref[" << m.startInRef << "-" << m.endInRef
                     << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
-            }
+            }*/
             Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, tempFile);
             reader.postProcess(tempFile, finalFile); //ja
         }
-        cout << "Meta: " << meta;
+        /*cout << "Meta: " << meta;
         cout << "Length: " << line_length;
         cout << "L list: " << Llist;
-        cout << "N list: " << Nlist;
+        cout << "N list: " << Nlist;*/
         
         
     } catch (const exception& e) {
