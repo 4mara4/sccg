@@ -6,7 +6,7 @@
 #include <stdexcept>
 using namespace std;
 
-/*   ON LINUX
+
 long long getCPUTime() {
     struct timespec ts;
     if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
@@ -14,7 +14,7 @@ long long getCPUTime() {
     } else {
         return 0LL;
     }
-} */
+}
 struct Position {
     int start;
     int end;
@@ -245,22 +245,22 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
+    long long start_time = getCPUTime();
     if (argc != 2) {
         std::cerr << "Upotreba: " << argv[0] << " <ref file name>\n";
         return 1;
         }
     
     try {
-        const string refFile="test//" + string(argv[1]);
+        const string refFile="test/" + string(argv[1]);
         SCCGD decompressor;
         decompressor.run(refFile);
     } catch (const exception& e) {
         cerr << e.what() << "\n";
         return 1;
     }
-    // long long end_time = getCPUTime();    UNCOMMENT ON LINUX
+    long long end_time = getCPUTime();  
     
-    // cout << "Execution time " << (end_time - start_time) << endl;  UNCOMMENT ON LINUX 
+    cout << "Execution time " << (end_time - start_time) << endl; 
     return 0;
 }

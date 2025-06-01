@@ -4,9 +4,9 @@
 #include <unordered_map>
 #include <vector>
 #include <ctime>
-#include <windows.h>  // Just testing on windows
+#include <climits>
 using namespace std;
-/*   ON LINUX
+
 long long getCPUTime() {
     struct timespec ts;
     if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
@@ -14,7 +14,7 @@ long long getCPUTime() {
     } else {
         return 0LL;
     }
-} */
+} 
 
 
 struct Position {
@@ -645,7 +645,7 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    // long long start_time = getCPUTime();   UNCOMMENT ON LINUX
+    long long start_time = getCPUTime(); 
     if (argc != 3) {
         std::cerr << "Upotreba: " << argv[0] << " <tar file name> <ref file name\n";
         return 1;
@@ -657,8 +657,8 @@ int main(int argc, char* argv[]) {
     
     const string tempFile  = "interim.txt";
     const string finalFile = "final.txt";
-    const string refFile="test//" + string(argv[2]);
-    const string tarFile="test//" + string(argv[1]);
+    const string refFile="test/" + string(argv[2]);
+    const string tarFile="test/" + string(argv[1]);
     ofstream(tempFile).close();      // reset privremenu
     ofstream(finalFile).close();     // reset konačnu
 
@@ -737,9 +737,8 @@ int main(int argc, char* argv[]) {
         cerr << "Greška: " << e.what() << endl;
     }
 
-    // long long end_time = getCPUTime();    UNCOMMENT ON LINUX
+    long long end_time = getCPUTime(); 
     
-    // cout << "Execution time " << (end_time - start_time) << endl;  UNCOMMENT ON LINUX 
-    system("pause"); 
+    cout << "Execution time " << (end_time - start_time) << endl;
     return 0;
 }
