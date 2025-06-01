@@ -1,2 +1,0 @@
->chromosome_1
-NNAAAATTTT
