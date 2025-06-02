@@ -7,16 +7,26 @@
 #include <climits>
 using namespace std;
 
+/**
+ * @brief Function for measuring CPU time.
+ * @return Returns long long CPU time in nanoseconds.
+ *
+ * Dora writing
+ */
 long long getCPUTime() {
     struct timespec ts;
     if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
-        return static_cast<long long>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec; // nanosekunde
+        return static_cast<long long>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec;
     } else {
         return 0LL;
     }
 } 
 
-
+/**
+ * Structure for positioning start and end in target and reference sequences.
+ *
+ * Marija writing
+ */
 struct Position {
     int startInRef;
     int endInRef;
@@ -196,7 +206,6 @@ public:
                             string& meta_data, int& line_length, string& Llist, string& Nlist){
         ifstream infile(inputfilename);
         ofstream outfile(outputfilename, ios::app); 
-        //stringstream Llist, Nlist, clean_seq;
 
         if (!infile.is_open()) {
             throw runtime_error("Could not open file: " + inputfilename);
@@ -205,7 +214,6 @@ public:
             throw runtime_error("Could not open file: " + outputfilename);
         }
 
-        //string meta_data, line;
         string line;
         getline(infile, meta_data);
         
@@ -265,6 +273,24 @@ public:
         }
         return clean_seq;
     }
+    /**
+     * @brief Writes the preamble information to an output file.
+     *
+     * This function opens (or creates) the specified file in truncate mode, ensuring any existing
+     * content is cleared. It then writes the provided metadata, the original line length,
+     * the list of lowercase region offsets/lengths (Llist), and the list of ‘N’ region offsets/lengths (Nlist),
+     * each on its own line, followed by an empty line to separate the preamble from subsequent data.
+     *
+     * @param finalFile   Path to the file where the preamble should be written.
+     * @param meta_data   The FASTA header or metadata string to write as the first line.
+     * @param line_length The original line‐length (number of characters per line) of the target sequence.
+     * @param Llist       A space‐separated string encoding lowercase‐base region offsets and lengths.
+     * @param Nlist       A space‐separated string encoding ‘N’‐region offsets and lengths.
+     *
+     * @throws std::runtime_error if the file cannot be opened for writing.
+     * 
+     * Marija writing
+     */
     void writePreamble(const string &finalFile,
                    const string &meta_data,
                    int line_length,
@@ -275,8 +301,8 @@ public:
         out << meta_data << "\n"
             << line_length << "\n"
             << Llist   << "\n"
-            << Nlist   << "\n\n";  // prazna linija prije postProcessa
-}
+            << Nlist   << "\n\n";  
+    }
 
 
     /**
@@ -299,11 +325,11 @@ public:
         int start_ = 0;
         while (start_ <= seq.length()- kmer_length) {
             string kmer = seq.substr(start_, kmer_length);
-            if(kmer == string(kmer_length, 'N')) {                             //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! reminder to check later
-                    start_= start_ + kmer_length ; // skip the N sequence   
-                    continue; // skip this k-mer    
+            if(kmer == string(kmer_length, 'N')) {                   
+                    start_= start_ + kmer_length ; 
+                    continue; 
             }
-            K_mer kmer_instance(kmer, start_); // reading the k-mer and its starting position
+            K_mer kmer_instance(kmer, start_);
             size_t key = hash<string>{}(kmer);
             localHash[key].push_back(kmer_instance);
             start_++;         
@@ -529,7 +555,7 @@ public:
 
                 if (startInTar > 0) {
                     string pre_allign = target.substr(0, startInTar);
-                    result += pre_allign + "\n";    // we write the pre-aligned part
+                    result += pre_allign + "\n";
                     trouble_parts += pre_allign.length();
                 }
                 result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";
@@ -537,24 +563,23 @@ public:
             }
 
             int endInTarPrev = list[i - 1].endInTar;
-            string mismatch = target.substr(endInTarPrev + 1, startInTar - endInTarPrev - 1);   // mismatch part between two alignments	
+            string mismatch = target.substr(endInTarPrev + 1, startInTar - endInTarPrev - 1);
 
             if (!mismatch.empty()) {
-                result += mismatch + "\n";     // if there was a mismatched part we need to write it down
+                result += mismatch + "\n"; 
                 trouble_parts += mismatch.length();
             }
 
-            result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";    // we write the aligned part
+            result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";
             endInTar = endInTarCurr;
             endRef = max(endRef, endInRef);
         }
 
-        // Optional: if alignment ends early, append the remainder of target
+        
         if (endInTar < static_cast<int>(target.length()) - 1) {
             result += target.substr(endInTar + 1) + "\n";
         }
 
-        // Optional: write to file
         if (!fileName.empty()) {
             ofstream out;
             if(local){out.open(fileName, ios::app); }
@@ -567,17 +592,13 @@ public:
             }
         }
 
-        //logic for mismatch counter
-        //cout<< "\ntrouble parts : "<< trouble_parts << " target_size \n" << target.size() << endl;
         if (trouble_parts > (target.size() * bad_segment_treshold)) {
             consec_bad_segments++;
-            //cout << "BAD SEGMENT if there are multiple consecutive go global, consecutive bad segments " << consec_bad_segments<< endl;
         } else {
             consec_bad_segments=0;
-            //cout<<"Consecutive bad segments " << consec_bad_segments<< endl;
         }
 
-        return list.back(); // return the last Position
+        return list.back();
     }
 
     /**
@@ -626,7 +647,6 @@ public:
             if (line.empty()) continue;
 
             if (line.find(',') != string::npos) {
-                // parsiraj start,end i samo ga spajaj u segs
                 int b,e; char c;
                 istringstream iss(line);
                 iss >> b >> c >> e;
@@ -659,8 +679,8 @@ int main(int argc, char* argv[]) {
     const string finalFile = "final.txt";
     const string refFile="test/" + string(argv[2]);
     const string tarFile="test/" + string(argv[1]);
-    ofstream(tempFile).close();      // reset privremenu
-    ofstream(finalFile).close();     // reset konačnu
+    ofstream(tempFile).close();
+    ofstream(finalFile).close();
 
 
     SCCGC reader;
@@ -672,21 +692,15 @@ int main(int argc, char* argv[]) {
     string Llist, Nlist;
     try {
         string sequence = reader.LocReadSeq(refFile);  
-        //cout << "Meta data: " << reader.meta_data << endl;
-        //cout << "Local sequence read: " << sequence << endl;
         string sequence_ref = reader.GloReadRefSeq(refFile);  
-        //cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
         string sequence_tar = reader.GloReadTarSeq(tarFile, "output.txt", meta, line_length, Llist, Nlist);
-        //cout << "Target sequence size "  << sequence_tar.size()<< endl;
         
-        //cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
         reader.writePreamble(tempFile, meta, line_length, Llist, Nlist);
-        // reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
 
         cout << "=== Lokalna podudaranja ===\n";
-        for (size_t i = 0; i < min(refBlocks.size(), tarBlocks.size()); ++i) {    // check!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  provjeri jel ok ? 
+        for (size_t i = 0; i < min(refBlocks.size(), tarBlocks.size()); ++i) {
             reader.createLocalHash(refBlocks[i], kmer_length);
             vector<Position> localMatches = reader.localMatch(refBlocks[i], tarBlocks[i], kmer_length);
 
@@ -696,12 +710,6 @@ int main(int argc, char* argv[]) {
                 m.endInRef   += block_offset;
             }
 
-            /*cout << "\nBlock " << i  << ": Pronadeno " << localMatches.size() << " podudaranja\n";
-            cout << "ref blok " << refBlocks[i] <<endl;
-            for (auto &m : localMatches) {
-                cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
-                     << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
-            }*/
             Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], tempFile, true);
             if(reader.consec_bad_segments >= reader.consecutive_bad_segment_tresh){
                 cout << "moramo prec na globalno, ne idemo dalje lokalno"<< endl;
@@ -719,19 +727,9 @@ int main(int argc, char* argv[]) {
             cout << "\n=== Globalna podudaranja ===\n";
             reader.globalHash.clear();
             auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
-            //cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
-            /*for (auto &m : globalMatches) {
-                cout << "Ref[" << m.startInRef << "-" << m.endInRef
-                    << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
-            }*/
             Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, tempFile);
             reader.postProcess(tempFile, finalFile); //ja
         }
-        /*cout << "Meta: " << meta;
-        cout << "Length: " << line_length;
-        cout << "L list: " << Llist;
-        cout << "N list: " << Nlist;*/
-        
         
     } catch (const exception& e) {
         cerr << "Greška: " << e.what() << endl;

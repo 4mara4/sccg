@@ -4,6 +4,20 @@
 #include <stdexcept>
 using namespace std;
 
+/**
+ * @brief Compares two text files line by line.
+ *
+ * Opens both files and reads them line by line simultaneously. If either file
+ * cannot be opened, throws a runtime_error. As soon as a mismatch is found
+ * (either differing lines or differing number of lines), prints the first
+ * difference and returns false. Returns true if all lines match exactly.
+ *
+ * @param path1 Path to the first file.
+ * @param path2 Path to the second file.
+ * @return true if the files are identical, false otherwise.
+ * @throws std::runtime_error if either file cannot be opened.
+ * Marija writing
+ */
 bool files_are_equal(const std::string& path1, const std::string& path2) {
     std::ifstream f1(path1), f2(path2);
     if (!f1.is_open() || !f2.is_open()) {

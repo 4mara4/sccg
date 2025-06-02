@@ -6,7 +6,10 @@
 #include <stdexcept>
 using namespace std;
 
-
+/**
+ * @brief Returns CPU thread time in nanoseconds.
+ * Dora writing
+ */
 long long getCPUTime() {
     struct timespec ts;
     if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
@@ -19,11 +22,20 @@ struct Position {
     int start;
     int end;
 };
+
+/**
+ * @brief Outputs a Position as “[start, end]”.
+ * Dora writing
+ */
 ostream& operator<<(ostream& os, const Position& pos) {
     os << "[" << pos.start << ", " << pos.end << "]";
     return os;
 }
 
+/**
+ * @brief Outputs a vector of Position objects in braces.
+ * Dora writing
+ */
 ostream& operator<<(ostream& os, const vector<Position>& v) {
     os << "{ ";
     for (const auto& p : v) {
@@ -40,7 +52,10 @@ public:
     int lineLen;
     vector<Position> L_list, N_list;
 
-    // Parsira preambulu iz final.txt
+    /**
+     * @brief Parses the first four lines from final.txt (meta, lineLen, L_list, N_list).
+     * Dora + Marija writing
+     */
     void parsePreproc(const string& final) {
         ifstream in(final);
         if (!in) throw runtime_error("Ne mogu otvoriti " + final);
@@ -50,11 +65,9 @@ public:
         while (getline(in, line)) {
             if (stage == 0) {
                 meta = line + "\n";
-                //cout << "meta " << meta << endl;
                 stage++;
             } else if (stage == 1) {
                 lineLen = stoi(line);
-                //cout << "Line length  " << lineLen << endl;
                 stage++;
             } else if (stage == 2 || stage == 3) {
                 if (line.empty()) {
@@ -87,31 +100,31 @@ public:
         }
     }
 
-
-    // Čita referencu iz FASTA (preskače header)
+    /**
+     * @brief Reads a FASTA sequence (skips header) and removes all 'N' characters.
+     * Marija writing
+     */
     string readSeq(const string& path) {
-    ifstream in(path);
-    if (!in) throw runtime_error("Ne mogu otvoriti " + path);
-    string header, line, seq;
-    // preskoči header
-    if (!getline(in, header)) 
-        throw runtime_error("Prazna FASTA datoteka: " + path);
+        ifstream in(path);
+        if (!in) throw runtime_error("Ne mogu otvoriti " + path);
+        string header, line, seq;
+        if (!getline(in, header)) throw runtime_error("Prazna FASTA datoteka: " + path);
 
-    // čitaj liniju po liniju
-    while (getline(in, line)) {
-        for (char c : line) {
-            // uppercase
-            char C = static_cast<char>(toupper(static_cast<unsigned char>(c)));
-            // izbaci sve 'N'
-            if (C != 'N') {
-                seq.push_back(C);
+        while (getline(in, line)) {
+            for (char c : line) {
+                char C = static_cast<char>(toupper(static_cast<unsigned char>(c)));
+                if (C != 'N') {
+                s   eq.push_back(C);
+                }
             }
         }
+        return seq;
     }
-    return seq;
-}
 
-    // Rekonstruira sirovu sekvencu iz delta-podataka final.txt i reference
+    /**
+     * @brief Reconstructs the raw sequence using delta entries and the reference string.
+     * Dora + Marija writing
+     */
     string reconstruct(const string& final,
                        const string& ref) {
         ifstream in(final);
@@ -124,21 +137,16 @@ public:
 
         while (getline(in, line)) {
             ++count;
-            // Preskači header, lineLen, L-list, N-list
             if (count <= 4) continue;
             if (line.empty()) continue;
 
             auto comma = line.find(',');
             if (comma != string::npos) {
-                // delta,len
                 int delta = stoi(line.substr(0, comma));
                 int len   = stoi(line.substr(comma + 1));
                 
                 int b     = prevEnd + delta;
-                int e     = b + len - 1;  // len = e-b
-                /* cout << "  b " << b;
-                cout << "  Len:   " << len;
-                cout << "  e " << e << endl; */
+                int e     = b + len - 1;  
                 if (b < 0 || e > (int)ref.size()) {
                     throw runtime_error("  Error: segment izvan ref granica: " +
                                         to_string(delta) + "+" +
@@ -149,15 +157,15 @@ public:
                 prevEnd = e;
             }
             else {
-                // literal mismatch
                 out += line;
             }
         }
         return out;
     }
-
-    // Ubacuje N-regije
-   
+    /**
+     * @brief Inserts 'N' regions at the specified positions.
+     * Marija writing
+     */   
     string insertNs(const string& raw, const vector<Position>& N_list) {
         string out;
         int rawIdx = 0;
@@ -184,7 +192,10 @@ public:
         return out;
     }
 
-    // Vraća lowercase u L-regijama
+    /**
+     * @brief Applies lowercase characters within intervals from L_list.
+     * Marija writing
+     */
     void applyLower(const vector<Position>& L_list,
                     string& seq) {
         for (auto& p : L_list) {
@@ -193,7 +204,10 @@ public:
         }
     }
 
-    // Ispisuje FASTA s linijskom dužinom
+    /**
+     * @brief Writes a FASTA file, wrapping lines at lineLen.
+     * Dora writing
+     */
     void writeFasta(const string& path,
                     const string& header,
                     const string& seq,
@@ -207,35 +221,27 @@ public:
         }
     }
 
+    /**
+     * @brief Main entry: reconstructs and writes the final FASTA.
+     * Dora + Marija writing
+     */
     void run(string refFile) {
 
         const string outFile = "output.fa";
         const string finalFile="final.txt";
 
-        // 1) Parsiraj preambulu
         parsePreproc(finalFile);
-        //cout << "l list " << L_list << endl;
-        //cout << "n list " << N_list << endl;
-        // 2) Učitaj referencu
         string refSeq = readSeq(refFile);
-
-        // 3) Rekonstruiraj raw
         string raw = reconstruct(finalFile, refSeq);
-        //cout << raw <<endl;
 
         refSeq.clear();
         refSeq.shrink_to_fit();
-
-        // 4) Ubaci N-regije
         string withNs = N_list.empty() ? raw : insertNs(raw, N_list);
    
         raw.clear();
         raw.shrink_to_fit();
-
-        // 5) Vraćanje lowercase
         applyLower(L_list, withNs);
 
-        // 6) Ispiši FASTA
         writeFasta(outFile, meta, withNs, lineLen);
         cout << "Reconstructed FASTA: " << outFile << "\n";
 
