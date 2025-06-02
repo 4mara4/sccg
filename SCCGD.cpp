@@ -114,7 +114,7 @@ public:
             for (char c : line) {
                 char C = static_cast<char>(toupper(static_cast<unsigned char>(c)));
                 if (C != 'N') {
-                s   eq.push_back(C);
+                    seq.push_back(C);
                 }
             }
         }
