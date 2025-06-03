@@ -251,7 +251,7 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    linux long long start_time = getCPUTime();
+    long long start_time = getCPUTime();
     if (argc != 2) {
         std::cerr << "Upotreba: " << argv[0] << " <ref file name>\n";
         return 1;

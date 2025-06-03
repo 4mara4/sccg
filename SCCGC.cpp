@@ -751,10 +751,10 @@ int main(int argc, char* argv[]) {
             Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, tempFile);
             reader.postProcess(tempFile, finalFile); //ja
         }
-        cout << "Meta: " << meta;
+        /*cout << "Meta: " << meta;
         cout << "Length: " << line_length;
         cout << "L list: " << Llist;
-        cout << "N list: " << Nlist;
+        cout << "N list: " << Nlist;*/
         
         
     } catch (const exception& e) {
