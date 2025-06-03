@@ -4,17 +4,21 @@
 #include <unordered_map>
 #include <vector>
 #include <ctime>
-//#include <climits>
+#include <climits>
 using namespace std;
 
-/*long long getCPUTime() {
+/**
+ * Function for measuring CPU time on Ubuntu Linux.
+ * Dora writing
+ */
+long long getCPUTime() {
     struct timespec ts;
     if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
-        return static_cast<long long>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec; // nanosekunde
+        return static_cast<long long>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec;
     } else {
         return 0LL;
     }
-} */
+}
 
 
 struct Position {
@@ -196,7 +200,6 @@ public:
                             string& meta_data, int& line_length, string& Llist, string& Nlist){
         ifstream infile(inputfilename);
         ofstream outfile(outputfilename, ios::app); 
-        //stringstream Llist, Nlist, clean_seq;
 
         if (!infile.is_open()) {
             throw runtime_error("Could not open file: " + inputfilename);
@@ -205,7 +208,6 @@ public:
             throw runtime_error("Could not open file: " + outputfilename);
         }
 
-        //string meta_data, line;
         string line;
         getline(infile, meta_data);
         
@@ -266,6 +268,12 @@ public:
         return clean_seq;
     }
     
+    /**
+     * @brief Function for writing header data to final file.
+     *
+     * Writes meta data, line length, list of lowercase and N positions.
+     * Marija writing
+     */
     void writePreamble(const string &finalFile,
                    const string &meta_data,
                    int line_length,
@@ -443,66 +451,39 @@ public:
     vector<Position> globalMatch(const string& ref,
                              const string& tar,
                              int klen,
-                             int limit = 100) 
-{
-    // Prag iza kojeg smatramo da je tar "mali" (tu možeš staviti block_size ili 100000)
-    // Za tar <= ovaj prag, u praksi onemogućavamo bilo kakvo 'skipanje' bazirano na limitu.
-    const int PRAG_ZA_MALI_TAR = 100000;  
+                             int limit = 100) {
+   
+        const int PRAG_ZA_MALI_TAR = 100000;  
 
-    // Ako je tar duži od PRAG_ZA_MALI_TAR, ponašamo se normalno (limit = default 100 ili onaj koji si proslijedio).
-    // Ako je kraći, želimo da effLimit bude dovoljno velik da NE preskače nijedno podudaranje:
-    int effLimit;
-    if ((int)tar.size() >= PRAG_ZA_MALI_TAR) {
-        effLimit = limit;       // npr. 100 ili što god si proslijedio
-    } else {
-        effLimit = (int)ref.size();  // može biti i INT_MAX, ali ref.size() je praktično "neograničeno"
-    }
-
-    // Sada ide ista logika, samo koristimo effLimit u prvom for-petlji.
-    createGlobalHash(ref, klen);
-    vector<Position> out;
-    int idx = 0;
-    int lastEIR = 0;  // kraj zadnjeg pogođenog bloka u referenci
-
-    while (idx + klen <= (int)tar.size()) {
-        string k = tar.substr(idx, klen);
-        size_t h = hash<string>{}(k);
-        auto it = globalHash.find(h);
-        if (it == globalHash.end()) {
-            idx++;
-            continue;
+        int effLimit;
+        if ((int)tar.size() >= PRAG_ZA_MALI_TAR) {
+            effLimit = limit; 
+        } else {
+            effLimit = (int)ref.size();
         }
 
-        int bestS = INT_MAX;
-        int bestE = 0;
-        bool foundInLimit = false;
+        createGlobalHash(ref, klen);
+        vector<Position> out;
+        int idx = 0;
+        int lastEIR = 0;
 
-        // 1) Prvo pokušavamo "unutar limita" – ali ako je tar < PRAG_ZA_MALI_TAR, effLimit = ref.size(),
-        //    znači da nijedan seed u praksi NEĆE pasti pod 'abs(...) > effLimit'.
-        for (auto &km : it->second) {
-            if (km.getKmer() != k)
+        while (idx + klen <= (int)tar.size()) {
+            string k = tar.substr(idx, klen);
+            size_t h = hash<string>{}(k);
+            auto it = globalHash.find(h);
+            if (it == globalHash.end()) {
+                idx++;
                 continue;
-
-            if (!out.empty() && abs(km.getStart() - lastEIR) > effLimit)
-                continue;
-
-            int ext = 0;
-            int r = km.getStart() + klen;
-            int t = idx + klen;
-            while (r < (int)ref.size() && t < (int)tar.size() && ref[r] == tar[t]) {
-                ext++; r++; t++;
             }
-            if (ext > bestE || (ext == bestE && km.getStart() < bestS)) {
-                bestE = ext;
-                bestS = km.getStart();
-                foundInLimit = true;
-            }
-        }
 
-        // 2) Ako nismo našli ništa unutar effLimit, onda “neograničeno” tražimo u cijeloj referenci
-        if (!foundInLimit) {
+            int bestS = INT_MAX;
+            int bestE = 0;
+            bool foundInLimit = false;
             for (auto &km : it->second) {
                 if (km.getKmer() != k)
+                    continue;
+
+                if (!out.empty() && abs(km.getStart() - lastEIR) > effLimit)
                     continue;
 
                 int ext = 0;
@@ -514,30 +495,42 @@ public:
                 if (ext > bestE || (ext == bestE && km.getStart() < bestS)) {
                     bestE = ext;
                     bestS = km.getStart();
+                    foundInLimit = true;
                 }
             }
+            if (!foundInLimit) {
+                for (auto &km : it->second) {
+                    if (km.getKmer() != k)
+                        continue;
+
+                    int ext = 0;
+                    int r = km.getStart() + klen;
+                    int t = idx + klen;
+                    while (r < (int)ref.size() && t < (int)tar.size() && ref[r] == tar[t]) {
+                        ext++; r++; t++;
+                    }
+                    if (ext > bestE || (ext == bestE && km.getStart() < bestS)) {
+                        bestE = ext;
+                        bestS = km.getStart();
+                    }
+                }
+            }
+            if (bestS != INT_MAX) {
+                Position p;
+                p.startInRef = bestS;
+                p.endInRef   = bestS + klen + bestE - 1;
+                p.startInTar = idx;
+                p.endInTar   = idx + klen + bestE - 1;
+                out.push_back(p);
+
+                lastEIR = p.endInRef;
+                idx += klen + bestE + 1;
+            } else {
+                idx++;
+            }
         }
-
-        // 3) Ako smo našli dobar match (bestS != INT_MAX), ubaci ga u rezultat
-        if (bestS != INT_MAX) {
-            Position p;
-            p.startInRef = bestS;
-            p.endInRef   = bestS + klen + bestE - 1;
-            p.startInTar = idx;
-            p.endInTar   = idx + klen + bestE - 1;
-            out.push_back(p);
-
-            lastEIR = p.endInRef;
-            idx += klen + bestE + 1;
-        } else {
-            idx++;
-        }
-    }
-
     return out;
-}
-
-
+    }
 
     /*
      * format_matches: Formats and outputs aligned and unaligned segments between
@@ -582,7 +575,7 @@ public:
 
                 if (startInTar > 0) {
                     string pre_allign = target.substr(0, startInTar);
-                    result += pre_allign + "\n";    // we write the pre-aligned part
+                    result += pre_allign + "\n";
                     trouble_parts += pre_allign.length();
                 }
                 result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";
@@ -590,24 +583,22 @@ public:
             }
 
             int endInTarPrev = list[i - 1].endInTar;
-            string mismatch = target.substr(endInTarPrev + 1, startInTar - endInTarPrev - 1);   // mismatch part between two alignments	
+            string mismatch = target.substr(endInTarPrev + 1, startInTar - endInTarPrev - 1);	
 
             if (!mismatch.empty()) {
-                result += mismatch + "\n";     // if there was a mismatched part we need to write it down
+                result += mismatch + "\n";  
                 trouble_parts += mismatch.length();
             }
 
-            result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";    // we write the aligned part
+            result += to_string(startInRef ) + "," + to_string(endInRef ) + "\n";
             endInTar = endInTarCurr;
             endRef = max(endRef, endInRef);
         }
 
-        // Optional: if alignment ends early, append the remainder of target
         if (endInTar < static_cast<int>(target.length()) - 1) {
             result += target.substr(endInTar + 1) + "\n";
         }
 
-        // Optional: write to file
         if (!fileName.empty()) {
             ofstream out;
             if(local){out.open(fileName, ios::app); }
@@ -620,17 +611,13 @@ public:
             }
         }
 
-        //logic for mismatch counter
-        //cout<< "\ntrouble parts : "<< trouble_parts << " target_size \n" << target.size() << endl;
         if (trouble_parts > (target.size() * bad_segment_treshold)) {
             consec_bad_segments++;
-            //cout << "BAD SEGMENT if there are multiple consecutive go global, consecutive bad segments " << consec_bad_segments<< endl;
         } else {
             consec_bad_segments=0;
-            //cout<<"Consecutive bad segments " << consec_bad_segments<< endl;
         }
 
-        return list.back(); // return the last Position
+        return list.back();
     }
 
     /**
@@ -679,7 +666,6 @@ public:
             if (line.empty()) continue;
 
             if (line.find(',') != string::npos) {
-                // parsiraj start,end i samo ga spajaj u segs
                 int b,e; char c;
                 istringstream iss(line);
                 iss >> b >> c >> e;
@@ -698,7 +684,7 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    //long long start_time = getCPUTime(); 
+    long long start_time = getCPUTime(); 
     if (argc != 3) {
         std::cerr << "Upotreba: " << argv[0] << " <tar file name> <ref file name\n";
         return 1;
@@ -710,12 +696,10 @@ int main(int argc, char* argv[]) {
     
     const string tempFile  = "interim.txt";
     const string finalFile = "final.txt";
-    const string refFile="testdata//" + string(argv[2]);
-    const string tarFile="testdata//" + string(argv[1]);
-    //const string refFile="test/" + string(argv[2]);
-    //const string tarFile="test/" + string(argv[1]);
-    ofstream(tempFile).close();      // reset privremenu
-    ofstream(finalFile).close();     // reset konačnu
+    const string refFile="test/" + string(argv[2]);
+    const string tarFile="test/" + string(argv[1]);
+    ofstream(tempFile).close();    
+    ofstream(finalFile).close();  
 
 
     SCCGC reader;
@@ -727,21 +711,15 @@ int main(int argc, char* argv[]) {
     string Llist, Nlist;
     try {
         string sequence = reader.LocReadSeq(refFile);  
-        //cout << "Meta data: " << reader.meta_data << endl;
-        //cout << "Local sequence read: " << sequence << endl;
         string sequence_ref = reader.GloReadRefSeq(refFile);  
-        //cout << "Ref sequence: " << sequence_ref<<" size "  << sequence_ref.size()<<  endl;
         string sequence_tar = reader.GloReadTarSeq(tarFile, "output.txt", meta, line_length, Llist, Nlist);
-        //cout << "Target sequence size "  << sequence_tar.size()<< endl;
         if(sequence_tar.length() < block_size * 5) {
             local = false;
         }
         
-        //cout << "block size " << block_size << endl;
         vector<string> refBlocks = reader.createBlocks(sequence_ref, block_size);
         vector<string> tarBlocks = reader.createBlocks(sequence_tar, block_size);
         reader.writePreamble(tempFile, meta, line_length, Llist, Nlist);
-        // reader.writePreamble("interim.txt", meta, line_length, Llist, Nlist);
 
         cout << "=== Lokalna podudaranja ===\n";
         for (size_t i = 0; i < min(refBlocks.size(), tarBlocks.size()) && local; ++i) {  
@@ -753,13 +731,6 @@ int main(int argc, char* argv[]) {
                 m.startInRef += block_offset;
                 m.endInRef   += block_offset;
             }
-
-            /*cout << "\nBlock " << i  << ": Pronadeno " << localMatches.size() << " podudaranja\n";
-            cout << "ref blok " << refBlocks[i] <<endl;
-            for (auto &m : localMatches) {
-                cout << "  Ref[" << m.startInRef << "-" << m.endInRef << "] "  
-                     << "Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
-            }*/
             Position lastPosLoc = reader.format_matches(localMatches, tarBlocks[i], tempFile, true);
             if(reader.consec_bad_segments >= reader.consecutive_bad_segment_tresh){
                 cout << "moramo prec na globalno, ne idemo dalje lokalno"<< endl;
@@ -777,11 +748,6 @@ int main(int argc, char* argv[]) {
             cout << "\n=== Globalna podudaranja ===\n";
             reader.globalHash.clear();
             auto globalMatches = reader.globalMatch(sequence_ref, sequence_tar, kmer_length);
-            //cout << "Pronadeno " << globalMatches.size() << " globalnih podudaranja\n";
-            /*for (auto &m : globalMatches) {
-                cout << "Ref[" << m.startInRef << "-" << m.endInRef
-                    << "] Tar[" << m.startInTar << "-" << m.endInTar << "]\n";
-            }*/
             Position lastPosLoc = reader.format_matches(globalMatches, sequence_tar, tempFile);
             reader.postProcess(tempFile, finalFile); //ja
         }
@@ -795,8 +761,8 @@ int main(int argc, char* argv[]) {
         cerr << "Greška: " << e.what() << endl;
     }
 
-    // linux long long end_time = getCPUTime(); 
+    long long end_time = getCPUTime(); 
     
-    // linux cout << "Execution time " << (end_time - start_time) << endl;
+    cout << "Execution time " << (end_time - start_time) << endl;
     return 0;
 }
