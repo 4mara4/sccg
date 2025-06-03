@@ -10,14 +10,14 @@ using namespace std;
  * @brief Returns CPU thread time in nanoseconds.
  * Dora writing
  */
-long long getCPUTime() {
+/*long long getCPUTime() {
     struct timespec ts;
     if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0) {
         return static_cast<long long>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec; // nanosekunde
     } else {
         return 0LL;
     }
-}
+}*/
 struct Position {
     int start;
     int end;
@@ -70,7 +70,7 @@ public:
                 lineLen = stoi(line);
                 stage++;
             } else if (stage == 2 || stage == 3) {
-                if (line.empty()) {
+                if (line == "x") {
                     stage++;
                     continue;
                 }
@@ -251,22 +251,23 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    long long start_time = getCPUTime();
+    //linux long long start_time = getCPUTime();
     if (argc != 2) {
         std::cerr << "Upotreba: " << argv[0] << " <ref file name>\n";
         return 1;
         }
     
     try {
-        const string refFile="test/" + string(argv[1]);
+        const string refFile="testdata//" + string(argv[1]);
+        // linux const string refFile="test/" + string(argv[1]);
         SCCGD decompressor;
         decompressor.run(refFile);
     } catch (const exception& e) {
         cerr << e.what() << "\n";
         return 1;
     }
-    long long end_time = getCPUTime();  
+    // linux long long end_time = getCPUTime();  
     
-    cout << "Execution time " << (end_time - start_time) << endl; 
+    // linux cout << "Execution time " << (end_time - start_time) << endl; 
     return 0;
 }
