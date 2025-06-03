@@ -713,6 +713,7 @@ int main(int argc, char* argv[]) {
         string sequence = reader.LocReadSeq(refFile);  
         string sequence_ref = reader.GloReadRefSeq(refFile);  
         string sequence_tar = reader.GloReadTarSeq(tarFile, "output.txt", meta, line_length, Llist, Nlist);
+        cout << "No of elements  "<< sequence_tar.size() <<endl;
         if(sequence_tar.length() < block_size * 5) {
             local = false;
         }
