@@ -70,7 +70,7 @@ public:
                 lineLen = stoi(line);
                 stage++;
             } else if (stage == 2 || stage == 3) {
-                if (line.empty()) {
+                if (line == "x") {
                     stage++;
                     continue;
                 }
